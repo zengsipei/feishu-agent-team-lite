@@ -3,11 +3,11 @@
 - Task ID: agent-team-1panel-readonly-precheck-20260526
 - Operator: Codex local workspace
 - Date/time: 2026-05-26 Asia/Shanghai
-- Scope: read-only evidence collection and post-deploy strict verification
+- Scope: read-only evidence collection, post-deploy strict verification, and real Feishu E2E
 - Target server: strict running-service pre-check executed; no blocking failures found
 - Local verification mode: Docker runtime/adapter already running
-- Next stage: Post-deploy real Feishu 8 Agent E2E
-- Formal release: blocked until off-host backup/rollback ownership is confirmed and real Feishu E2E passes
+- Next stage: Off-host backup/rollback ownership confirmation and formal release review
+- Formal release: blocked until off-host backup/rollback ownership is confirmed and the user explicitly approves release readiness
 
 ## Release Gate State
 
@@ -21,8 +21,8 @@
 | Local running-service strict pre-check | Pass | Bash and PowerShell both passed with `--require-compose-services`, runtime health required, adapter connected required, and local mapped port `18080` required listening. |
 | Target 1Panel server read-only pre-check | Conditional pass | `pass=13`, `warn=1`, `fail=0`, `not_verified=4`; `ok=true`; no blocking failures reported by the read-only pre-check. |
 | Target 1Panel running-service strict pre-check | Pass | `pass=16`, `warn=0`, `fail=0`, `not_verified=2`; `ok=true`; Compose containers, runtime health, port `8080`, adapter workers, and logs passed. |
-| Post-deploy real Feishu 8 Agent E2E | Pending | Must verify visible `@Agent` replies in a project group against expected app routes. |
-| Formal release | Blocked | Requires off-host backup/rollback ownership confirmation and post-deploy real Feishu E2E pass. |
+| Post-deploy real Feishu 8 Agent E2E | Pass | Batch `E8-234504`; 8 sent, 8 replies, 8 app sender matches, 8 real mentions, 0 failures. |
+| Formal release | Blocked | Requires off-host backup/rollback ownership confirmation and explicit user approval. |
 
 ## Commands Run Locally
 
@@ -195,7 +195,55 @@ The target running-service gate is ready for real Feishu E2E because:
 - Adapter status has 8 files and 8 connected workers.
 - Logs reported 0 problem lines.
 
-The final release remains blocked until all 8 real `@Agent` replies pass in a project group.
+The final release remains blocked until off-host backup/rollback ownership is confirmed and the user explicitly approves release readiness.
+
+## Post-Deploy Real Feishu 8 Agent E2E Evidence
+
+Source summary:
+
+- Source: local `lark-cli` user-identity visible message test
+- Test group: `Agent Team E2E`
+- Generated at: 2026-05-26 23:45 Asia/Shanghai
+- Batch: `E8-234504`
+- Expected agent count: 8
+- Raw chat IDs, open IDs, message IDs, app IDs, app secrets, tokens, raw logs, and private config values: suppressed
+
+| sent | replies | pass | fail |
+| --- | --- | --- | --- |
+| 8 | 8 | 8 | 0 |
+
+### E2E Checks
+
+| Check | Result | Sanitized Evidence |
+| --- | --- | --- |
+| Test group | Pass | `Agent Team E2E` resolved by name; raw chat ID suppressed. |
+| Bot roster | Pass | 8 Bot members found in the test group; raw open IDs suppressed. |
+| Runtime route map | Pass | 8 runtime apps found; 8 expected app IDs present; raw app IDs suppressed. |
+| Real mention requests | Pass | 8/8 request messages contained a real Feishu mention. |
+| Replies | Pass | 8/8 requests received replies. |
+| Reply linkage | Pass | 8/8 replies were linked to the corresponding request message. |
+| Sender type | Pass | 8/8 replies were sent by `app`. |
+| App route match | Pass | 8/8 reply sender app IDs matched the runtime route map. |
+| LLM provider | Pass | 8/8 replies returned the requested one-sentence confirmation; no model-unavailable fallback was observed. |
+
+### E2E Agent Results
+
+| Agent ID | Agent name | Bot display name | Result |
+| --- | --- | --- | --- |
+| `rd-dispatcher` | R&D Dispatcher | R&D Dispatcher | Pass |
+| `product` | Product Agent | product-agent | Pass |
+| `architect` | Architect Agent | Architect Agent | Pass |
+| `coding` | Coding Agent | Coding Agent | Pass |
+| `review` | Review Agent | Review Agent | Pass |
+| `qa` | QA Agent | QA Agent | Pass |
+| `docs-memory` | Docs Memory Agent | Docs Memory Agent | Pass |
+| `release` | Release Agent | Release Agent | Pass |
+
+### E2E Notes
+
+- Product's Bot display name in the group is `product-agent`, while the runtime role name is `Product Agent`.
+- This display-name difference did not affect routing: the request mention, reply sender type, and expected app route all passed.
+- The previous model-provider failure was resolved before batch `E8-234504`; this batch did not return the fallback text `模型服务暂时不可用，请稍后重试。`.
 
 ## Required Server Evidence Fields
 
@@ -212,11 +260,12 @@ The final release remains blocked until all 8 real `@Agent` replies pass in a pr
 
 ## Risks And Blockers
 
-- Formal release is still blocked until off-host backup/rollback ownership is confirmed and post-deploy real Feishu E2E passes.
+- Formal release is still blocked until off-host backup/rollback ownership is confirmed and the user explicitly approves release readiness.
 - The target 1Panel server strict running-service pre-check now reports no blocking failures.
 - Adapter worker status passed with 8 connected workers.
 - Runtime health passed in the target environment.
 - Compose runtime state passed with 2 containers.
+- Post-deploy real Feishu 8 Agent E2E passed with batch `E8-234504`.
 - Off-host backup target and rollback owner remain operator-confirmed items.
 - The next stage is not remote CI/CD access. Release Agent may coordinate Feishu approvals or GitHub workflows for other systems, but must not operate this 1Panel server.
 - Agents still cannot emit real Feishu rich-text mentions for automatic multi-Agent relay; unattended cross-Agent handoff requires later orchestration work.
@@ -231,4 +280,4 @@ The final release remains blocked until all 8 real `@Agent` replies pass in a pr
 
 ## Recommendation
 
-The target running-service evidence can move to post-deploy real Feishu 8 Agent E2E. Do not announce release readiness until off-host backup/rollback ownership is confirmed and all 8 visible `@Agent` replies pass in the target environment. Until then, restart, recreate, build, pull, configuration writes, and release announcement remain forbidden unless explicitly approved as rollback or remediation.
+The target running-service evidence and post-deploy real Feishu 8 Agent E2E have passed. Do not announce release readiness until off-host backup/rollback ownership is confirmed and the user explicitly approves release readiness. Until then, restart, recreate, build, pull, configuration writes, and release announcement remain forbidden unless explicitly approved as rollback or remediation.
