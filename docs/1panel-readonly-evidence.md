@@ -4,7 +4,7 @@
 - Operator: Codex local workspace
 - Date/time: 2026-05-26 Asia/Shanghai
 - Scope: read-only evidence collection only
-- Target server: pending operator execution
+- Target server: read-only pre-check executed; blocking failures found
 - Local verification mode: Docker runtime/adapter already running
 - Formal deployment: blocked
 
@@ -18,8 +18,8 @@
 | Local Bash read-only pre-check script | Pass | `pass=16`, `warn=0`, `fail=0`, `not_verified=2`; strict JSON parse passed. |
 | Local PowerShell read-only pre-check script | Pass | `pass=16`, `warn=0`, `fail=0`, `not_verified=2`. |
 | Local running-service strict pre-check | Pass | Bash and PowerShell both passed with `--require-compose-services`, runtime health required, adapter connected required, and local mapped port `18080` required listening. |
-| Target 1Panel server read-only pre-check | Pending | Must be run on `/opt/feishu-agent-team` or the chosen deployment directory. |
-| Formal deployment/release | Blocked | Requires reviewed server evidence and explicit user approval. |
+| Target 1Panel server read-only pre-check | Fail | `pass=8`, `warn=2`, `fail=4`, `not_verified=4`; `ok=false`; blocking failures are missing private runtime files and invalid Compose config. |
+| Formal deployment/release | Blocked | Target server evidence has blocking failures; deployment remains forbidden. |
 
 ## Commands Run Locally
 
@@ -56,55 +56,71 @@
 | Off-host backup target | Not verified | Requires operator confirmation on the server. |
 | Formal deploy approval | Not verified | Still blocked until user reviews server evidence and explicitly approves deployment. |
 
-## Target Server Evidence Still Required
+## Target Server Read-Only Evidence
 
-Run from the target deployment directory, without starting, restarting, recreating, or modifying services:
+Source summary:
 
-```bash
-bash ./1panel-readonly-precheck.sh \
-  --root-path . \
-  --base-url http://127.0.0.1:8080 \
-  --adapter-status-dir ./feishu-channel-adapter/status \
-  --port-mode ReportOnly \
-  --json
-```
+- Source: target-reportonly-precheck
+- Server label: target-1panel
+- Deployment directory label: feishu-agent-team
+- Runtime mode: pre-deploy
+- Generated at: 2026-05-26T20:50:36+08:00
+- Overall ok: false
+- Expected agent count: 8
+- Port mode: ReportOnly
+- Raw env values, app IDs, app secrets, status file bodies, response bodies, and logs: suppressed
 
-```powershell
-pwsh ./1panel-readonly-precheck.ps1 `
-  -RootPath . `
-  -BaseUrl http://127.0.0.1:8080 `
-  -AdapterStatusDir ./feishu-channel-adapter/status `
-  -PortMode ReportOnly `
-  -Json
-```
+| pass | warn | fail | not_verified |
+| --- | --- | --- | --- |
+| 8 | 2 | 4 | 4 |
 
-If the target services are already running and the operator wants runtime state enforced:
+### Target Key Evidence
 
-```bash
-bash ./1panel-readonly-precheck.sh \
-  --root-path . \
-  --base-url http://127.0.0.1:8080 \
-  --adapter-status-dir ./feishu-channel-adapter/status \
-  --require-compose-services \
-  --require-runtime-health \
-  --require-adapter-connected \
-  --port-mode RequireListening \
-  --json
-```
+| Area | Result | Sanitized Evidence |
+| --- | --- | --- |
+| Host resources | Pass | Memory total `23975 MB`, available `15115 MB`; disk free `78.88 GB`, used `112.83 GB`. |
+| Directory layout | Pass | 6 paths checked, 6 exist, 6 ACL-readable; write test not performed. |
+| Runtime env | Fail | Missing env file; values suppressed. |
+| Adapter env | Fail | Missing env file; values suppressed. |
+| Runtime config | Fail | Missing runtime config file; secrets suppressed. |
+| Docker/Compose | Fail | Compose file and CLI are present, but `docker compose config` failed; `compose ps` could not be read. |
+| Port state | Pass | Port `8080` observed as listening via `ss`; policy was `ReportOnly`. |
+| Runtime health | Not verified | Runtime health endpoint is not reachable. |
+| Network | Pass | Feishu Open Platform reached and returned an HTTP response. |
+| Adapter status | Warn | 0 status files, expected 8; 0 connected; app IDs suppressed. |
+| Logs | Not verified | Compose logs could not be fully read; raw logs suppressed. |
+| Backup inventory | Pass | 7 backup candidates checked, 1 exists; contents suppressed. |
+| Off-host backup target | Not verified | Operator confirmation still required. |
+| Formal deploy approval | Not verified | Still blocked until failures are resolved, evidence is reviewed, and user explicitly approves deployment stage. |
 
-```powershell
-pwsh ./1panel-readonly-precheck.ps1 `
-  -RootPath . `
-  -BaseUrl http://127.0.0.1:8080 `
-  -AdapterStatusDir ./feishu-channel-adapter/status `
-  -RequireComposeServices `
-  -RequireRuntimeHealth `
-  -RequireAdapterConnected `
-  -PortMode RequireListening `
-  -Json
-```
+### Target Blocking Failures
 
-After either command, convert the JSON to a Markdown summary before updating this file. Do not paste the raw JSON:
+| Area | Name | Summary |
+| --- | --- | --- |
+| config | runtime env | Missing env file. |
+| config | adapter env | Missing env file. |
+| config | runtime config | Missing runtime config file. |
+| docker | compose config | `docker compose config` failed. |
+
+### Target Warnings
+
+| Area | Name | Summary |
+| --- | --- | --- |
+| docker | compose ps | `docker compose ps` could not be read. |
+| adapter | worker status files | Adapter worker status files are incomplete or not all connected. |
+
+### Target Not Verified
+
+| Area | Name | Summary |
+| --- | --- | --- |
+| network | runtime health | Runtime health endpoint is not reachable. |
+| logs | compose logs | Some compose logs could not be read. |
+| rollback | external backup target | Operator must confirm the off-host backup target and rollback owner before deployment. |
+| release_gate | formal deploy | Formal deployment remains blocked until sanitized evidence is reviewed and explicitly approved. |
+
+### Target Re-Check Command
+
+After resolving the blocking failures without running deployment, restart, recreate, build, pull, or production write operations in this stage, rerun the read-only summary command:
 
 ```bash
 bash ./1panel-readonly-precheck.sh \
@@ -136,7 +152,10 @@ bash ./1panel-readonly-precheck.sh \
 ## Risks And Blockers
 
 - Formal deployment and release are still blocked.
-- The target 1Panel server has not yet produced read-only evidence in this repository.
+- The target 1Panel server read-only pre-check executed but failed with 4 blocking failures.
+- Required private files are missing on the target server: runtime `.env`, adapter `.env`, and runtime config.
+- Target `docker compose config` failed; Compose configuration must be diagnosed using sanitized output only.
+- Runtime health and compose logs are not verified on the target server.
 - Off-host backup target and rollback owner remain operator-confirmed items.
 - Agents still cannot emit real Feishu rich-text mentions for automatic multi-Agent relay; unattended cross-Agent handoff requires later orchestration work.
 
@@ -150,4 +169,4 @@ bash ./1panel-readonly-precheck.sh \
 
 ## Recommendation
 
-Proceed only to target-server read-only evidence collection. Do not proceed to formal deployment until the server evidence package has no blocking failures, backup/rollback ownership is confirmed, and the user explicitly approves the next stage.
+Do not proceed to formal deployment. Resolve the target server blocking failures with read-only diagnosis and operator-managed private file preparation only, rerun the target read-only pre-check, and continue only after the server evidence package has no blocking failures, backup/rollback ownership is confirmed, and the user explicitly approves the next stage.
