@@ -13,7 +13,8 @@ from lark_oapi.core.enum import LogLevel
 
 from .comment_drive import DriveCommentClient
 from .config import Settings
-from .registry import AgentApp
+from .handoff import BotRosterClient, HandoffError, HandoffSender
+from .registry import AgentApp, AgentAppRegistry
 from .runtime_client import RuntimeClient
 from .serialization import attr, nested_attr, to_jsonable
 
@@ -29,6 +30,7 @@ class ChannelAdapter:
             auth_token=settings.runtime_auth_token,
             timeout_seconds=settings.runtime_timeout_seconds,
         )
+        self.registry = AgentAppRegistry(settings.agent_runtime_config_path)
         self.channels: list[FeishuChannel] = []
         self.comment_clients: dict[str, DriveCommentClient] = {}
         self._stop_event = asyncio.Event()
@@ -128,9 +130,15 @@ class ChannelAdapter:
             payload.get("message_id"),
         )
         reply = await self.runtime.post_message(payload)
-        await self._send_message_reply(channel, message, reply)
+        await self._send_message_reply(channel, app, message, reply)
 
-    async def _send_message_reply(self, channel: FeishuChannel, message: Any, reply: dict[str, Any]) -> None:
+    async def _send_message_reply(
+        self,
+        channel: FeishuChannel,
+        app: AgentApp,
+        message: Any,
+        reply: dict[str, Any],
+    ) -> None:
         status = reply.get("status")
         reply_text = (reply.get("reply_text") or "").strip()
         if status == "ignored" or not reply_text:
@@ -146,6 +154,63 @@ class ChannelAdapter:
         result = await channel.send(chat_id, {"markdown": reply_text}, opts)
         if not getattr(result, "success", False):
             logger.warning("Channel send failed result=%s", to_jsonable(result))
+            return
+
+        await self._send_handoff_if_requested(channel, app, chat_id, reply)
+
+    async def _send_handoff_if_requested(
+        self,
+        channel: FeishuChannel,
+        app: AgentApp,
+        chat_id: str,
+        reply: dict[str, Any],
+    ) -> None:
+        handoff = reply.get("handoff")
+        if not isinstance(handoff, dict):
+            return
+
+        to_agent_id = str(handoff.get("to_agent_id") or "").strip()
+        text = str(handoff.get("text") or "").strip()
+        if not to_agent_id or not text:
+            return
+
+        sender = HandoffSender(
+            registry=self.registry,
+            roster_client=BotRosterClient(channel.client),
+        )
+        try:
+            result, target = await sender.send(
+                channel=channel,
+                chat_id=chat_id,
+                from_agent_id=reply.get("agent_id") or app.agent_id,
+                to_agent_id=to_agent_id,
+                text=text,
+                title="Agent Handoff",
+            )
+        except HandoffError as exc:
+            logger.warning(
+                "Agent handoff failed from_agent_id=%s to_agent_id=%s error=%s",
+                reply.get("agent_id") or app.agent_id,
+                to_agent_id,
+                exc,
+            )
+            return
+
+        if not getattr(result, "success", False):
+            logger.warning(
+                "Agent handoff send failed from_agent_id=%s to_agent_id=%s result=%s",
+                reply.get("agent_id") or app.agent_id,
+                to_agent_id,
+                to_jsonable(result),
+            )
+            return
+
+        logger.info(
+            "Agent handoff sent from_agent_id=%s to_agent_id=%s target_agent_id=%s",
+            reply.get("agent_id") or app.agent_id,
+            to_agent_id,
+            target.agent.agent_id,
+        )
 
     async def _handle_comment(self, app: AgentApp, comment: Any) -> None:
         payload = await self._normalize_comment(app, comment)

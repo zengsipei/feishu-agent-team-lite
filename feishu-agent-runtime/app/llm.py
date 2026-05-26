@@ -58,6 +58,10 @@ class OpenAICompatibleClient:
                 "role": "user",
                 "content": (
                     f"Project context metadata: {metadata}\n\n"
+                    "Response format: normally return plain text. If another agent should continue, "
+                    "return only strict JSON like "
+                    '{"reply_text":"...","handoff":{"to_agent_id":"architect","text":"..."}}. '
+                    "The handoff field may be null. Use only metadata.available_agent_ids for to_agent_id.\n\n"
                     f"User message:\n{user_text}"
                 ),
             }

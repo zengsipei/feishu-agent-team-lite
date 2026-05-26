@@ -1,8 +1,10 @@
+import json
 import logging
+from typing import Any
 
 from .agents import AgentConfig, AgentRegistry
 from .llm import LLMClient
-from .models import CardAction, ChannelComment, ChannelMessage, RuntimeReply
+from .models import CardAction, ChannelComment, ChannelMessage, RuntimeHandoff, RuntimeReply
 from .store import RuntimeStore
 
 logger = logging.getLogger(__name__)
@@ -68,8 +70,13 @@ class AgentRuntime:
             metadata={"sender_id": msg.sender_id, "sender_name": msg.sender_name},
         )
         history = self.store.recent_messages(session_id, self.max_context_messages)
+        available_agent_ids = [
+            item.agent_id
+            for item in self.registry.list_agents()
+            if item.agent_id != agent.agent_id
+        ]
         try:
-            reply_text = await self.llm.complete(
+            raw_reply_text = await self.llm.complete(
                 agent=agent,
                 user_text=msg.text,
                 history=history,
@@ -79,6 +86,7 @@ class AgentRuntime:
                     "thread_id": msg.thread_id,
                     "sender_id": msg.sender_id,
                     "reply_mode": msg.reply_mode,
+                    "available_agent_ids": available_agent_ids,
                 },
             )
         except Exception as exc:
@@ -91,13 +99,22 @@ class AgentRuntime:
                 reply_text="模型服务暂时不可用，请稍后重试。",
                 metadata={"project_id": project_id, "error": type(exc).__name__},
             )
+        reply_text, handoff, envelope_parsed = parse_reply_envelope(
+            raw_reply_text,
+            current_agent_id=agent.agent_id,
+            available_agent_ids=set(available_agent_ids),
+        )
         response_id = str(
             self.store.add_message(
                 session_id=session_id,
                 role="assistant",
                 content=reply_text,
                 source_type="runtime",
-                metadata={"agent_id": agent.agent_id},
+                metadata={
+                    "agent_id": agent.agent_id,
+                    "handoff": handoff.model_dump() if handoff else None,
+                    "envelope_parsed": envelope_parsed,
+                },
             )
         )
         return RuntimeReply(
@@ -107,6 +124,8 @@ class AgentRuntime:
             session_id=session_id,
             response_id=response_id,
             reply_text=reply_text,
+            handoff_to=handoff.to_agent_id if handoff else None,
+            handoff=handoff,
             metadata={"project_id": project_id},
         )
 
@@ -154,3 +173,59 @@ class AgentRuntime:
             reply_text="Card action recorded.",
             metadata={"action": action.action},
         )
+
+
+def parse_reply_envelope(
+    raw_text: str,
+    *,
+    current_agent_id: str,
+    available_agent_ids: set[str],
+) -> tuple[str, RuntimeHandoff | None, bool]:
+    text = (raw_text or "").strip()
+    if not text:
+        return "", None, False
+
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError:
+        return text, None, False
+
+    if not isinstance(payload, dict):
+        return text, None, False
+
+    reply_text = payload.get("reply_text")
+    if not isinstance(reply_text, str):
+        return text, None, False
+
+    handoff = parse_handoff(
+        payload.get("handoff"),
+        current_agent_id=current_agent_id,
+        available_agent_ids=available_agent_ids,
+    )
+    return reply_text.strip(), handoff, True
+
+
+def parse_handoff(
+    value: Any,
+    *,
+    current_agent_id: str,
+    available_agent_ids: set[str],
+) -> RuntimeHandoff | None:
+    if value in (None, False):
+        return None
+    if not isinstance(value, dict):
+        return None
+
+    to_agent_id = value.get("to_agent_id")
+    text = value.get("text")
+    if not isinstance(to_agent_id, str) or not isinstance(text, str):
+        return None
+
+    to_agent_id = to_agent_id.strip()
+    text = text.strip()
+    if not to_agent_id or not text or to_agent_id == current_agent_id:
+        return None
+    if to_agent_id not in available_agent_ids:
+        return None
+
+    return RuntimeHandoff(to_agent_id=to_agent_id, text=text)

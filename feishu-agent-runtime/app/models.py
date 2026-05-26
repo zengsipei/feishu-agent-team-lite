@@ -51,6 +51,11 @@ class CardAction(BaseModel):
     raw: dict[str, Any] = Field(default_factory=dict)
 
 
+class RuntimeHandoff(BaseModel):
+    to_agent_id: str
+    text: str
+
+
 class RuntimeReply(BaseModel):
     status: Literal["ok", "ignored", "error"]
     agent_id: str | None = None
@@ -59,6 +64,7 @@ class RuntimeReply(BaseModel):
     response_id: str | None = None
     reply_text: str = ""
     handoff_to: str | None = None
+    handoff: RuntimeHandoff | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
