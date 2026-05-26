@@ -28,6 +28,7 @@ docker-compose.full.yml
 README.md
 1panel-readonly-precheck.sh
 1panel-readonly-precheck.ps1
+1panel-summarize-precheck.py
 monitor-services.ps1
 smoke-services.ps1
 docs/
@@ -72,6 +73,22 @@ bash ./1panel-readonly-precheck.sh \
   --adapter-status-dir ./feishu-channel-adapter/status \
   --port-mode ReportOnly \
   --json
+```
+
+Generate the Markdown evidence block from the JSON instead of pasting raw JSON into git:
+
+```bash
+bash ./1panel-readonly-precheck.sh \
+  --root-path . \
+  --base-url http://127.0.0.1:8080 \
+  --adapter-status-dir ./feishu-channel-adapter/status \
+  --port-mode ReportOnly \
+  --json \
+  | python3 ./1panel-summarize-precheck.py - \
+      --source-label target-reportonly-precheck \
+      --server-label target-1panel \
+      --deployment-label feishu-agent-team \
+      --runtime-mode pre-deploy
 ```
 
 PowerShell fallback:

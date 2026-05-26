@@ -30,7 +30,9 @@
 | `bash ./1panel-readonly-precheck.sh --root-path . --base-url http://127.0.0.1:18080 --adapter-status-dir ./feishu-channel-adapter/status --ports 18080 --require-compose-services --require-runtime-health --require-adapter-connected --port-mode RequireListening --json` | Pass | `pass=16`, `warn=0`, `fail=0`, `not_verified=2`; running Docker services were only read. |
 | `pwsh -NoProfile -File ./1panel-readonly-precheck.ps1 -RootPath . -BaseUrl http://127.0.0.1:18080 -AdapterStatusDir ./feishu-channel-adapter/status -Ports 18080 -RequireComposeServices -RequireRuntimeHealth -RequireAdapterConnected -PortMode RequireListening -Json` | Pass | `pass=16`, `warn=0`, `fail=0`, `not_verified=2`; Windows Docker Desktop port exposure was verified with read-only TCP connect fallback after listener table lookup. |
 | `pwsh -NoProfile -File ./monitor-services.ps1 -Docker -BaseUrl http://127.0.0.1:18080 -AdapterStatusDir ./feishu-channel-adapter/status -Json` | Pass | Raw output excluded from evidence because it includes real app IDs and local paths. |
+| `pwsh -NoProfile -File ./1panel-readonly-precheck.ps1 ... -Json | python ./1panel-summarize-precheck.py - ...` | Pass | Generated a Markdown evidence block containing only counts, statuses, non-sensitive service names, and suppressed-value markers. |
 | PowerShell parser check for `1panel-readonly-precheck.ps1`, `smoke-services.ps1`, and `monitor-services.ps1` | Pass | Syntax only. |
+| `python -m py_compile ./1panel-summarize-precheck.py` | Pass | Summarizer syntax/import validation only. |
 | `bash -n ./1panel-readonly-precheck.sh` | Pass | Bash syntax only. |
 | `git diff --check` | Pass | No whitespace or patch formatting issues. |
 | Sensitive pattern scan over README, docs, and service scripts | Pass | Matches were limited to variable names or example commands; no real private IDs or secret values found. |
@@ -100,6 +102,22 @@ pwsh ./1panel-readonly-precheck.ps1 `
   -RequireAdapterConnected `
   -PortMode RequireListening `
   -Json
+```
+
+After either command, convert the JSON to a Markdown summary before updating this file. Do not paste the raw JSON:
+
+```bash
+bash ./1panel-readonly-precheck.sh \
+  --root-path . \
+  --base-url http://127.0.0.1:8080 \
+  --adapter-status-dir ./feishu-channel-adapter/status \
+  --port-mode ReportOnly \
+  --json \
+  | python3 ./1panel-summarize-precheck.py - \
+      --source-label target-reportonly-precheck \
+      --server-label target-1panel \
+      --deployment-label feishu-agent-team \
+      --runtime-mode pre-deploy
 ```
 
 ## Required Server Evidence Fields

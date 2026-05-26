@@ -127,6 +127,63 @@ The script intentionally:
 - records backup candidates without creating backup files
 - exits `1` when required read-only checks fail
 
+## Generate A Sanitized Summary
+
+Use `1panel-summarize-precheck.py` to turn pre-check JSON into a Markdown evidence block. This reduces the chance of copying raw server JSON, logs, status files, or private paths into git.
+
+Pre-deploy mode:
+
+```bash
+bash ./1panel-readonly-precheck.sh \
+  --root-path . \
+  --base-url http://127.0.0.1:8080 \
+  --adapter-status-dir ./feishu-channel-adapter/status \
+  --port-mode ReportOnly \
+  --json \
+  | python3 ./1panel-summarize-precheck.py - \
+      --source-label target-reportonly-precheck \
+      --server-label target-1panel \
+      --deployment-label feishu-agent-team \
+      --runtime-mode pre-deploy
+```
+
+Already-running mode:
+
+```bash
+bash ./1panel-readonly-precheck.sh \
+  --root-path . \
+  --base-url http://127.0.0.1:8080 \
+  --adapter-status-dir ./feishu-channel-adapter/status \
+  --require-compose-services \
+  --require-runtime-health \
+  --require-adapter-connected \
+  --port-mode RequireListening \
+  --json \
+  | python3 ./1panel-summarize-precheck.py - \
+      --source-label target-strict-precheck \
+      --server-label target-1panel \
+      --deployment-label feishu-agent-team \
+      --runtime-mode already-running
+```
+
+PowerShell fallback:
+
+```powershell
+$json = pwsh ./1panel-readonly-precheck.ps1 `
+  -RootPath . `
+  -BaseUrl http://127.0.0.1:8080 `
+  -AdapterStatusDir ./feishu-channel-adapter/status `
+  -PortMode ReportOnly `
+  -Json
+$json | python ./1panel-summarize-precheck.py - `
+  --source-label target-reportonly-precheck `
+  --server-label target-1panel `
+  --deployment-label feishu-agent-team `
+  --runtime-mode pre-deploy
+```
+
+Only paste the generated Markdown summary into `docs/1panel-readonly-evidence.md`. Do not commit raw JSON files from the server unless they have been separately reviewed and sanitized.
+
 ## Manual Fallback Checks
 
 Use these only when PowerShell is unavailable. Keep outputs sanitized.
