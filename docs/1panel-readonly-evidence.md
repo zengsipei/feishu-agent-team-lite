@@ -166,4 +166,4 @@ bash ./1panel-readonly-precheck.sh \
 
 ## Recommendation
 
-The read-only evidence can move to review. The recommended next stage is Manual 1Panel Deploy Gate. Do not proceed to formal deployment until off-host backup/rollback ownership is confirmed and the user explicitly opens that gate. Until then, deployment, restart, recreate, build, pull, and production configuration write operations remain forbidden.
+The read-only evidence can move to review. The recommended next stage is [Manual 1Panel Deploy Gate](./1panel-manual-deploy-gate.md). Do not proceed to formal deployment until off-host backup/rollback ownership is confirmed and the user explicitly opens that gate. Until then, deployment, restart, recreate, build, pull, and production configuration write operations remain forbidden.

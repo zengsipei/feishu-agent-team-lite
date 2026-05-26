@@ -2,7 +2,7 @@
 
 Use this runbook before any formal 1Panel deployment or release. This stage is evidence collection only.
 
-The next stage after a passing evidence review is **Manual 1Panel Deploy Gate**. That gate authorizes only a human-operated 1Panel deployment window after explicit user approval; it does not authorize Agent-run server operations or remote CI/CD deployment.
+The next stage after a passing evidence review is [Manual 1Panel Deploy Gate](./1panel-manual-deploy-gate.md). That gate authorizes only a human-operated 1Panel deployment window after explicit user approval; it does not authorize Agent-run server operations or remote CI/CD deployment.
 
 ## Release Gate
 

@@ -104,7 +104,7 @@ pwsh ./1panel-readonly-precheck.ps1 `
   -Json
 ```
 
-Do not continue to `1Panel Compose Setup` until the sanitized evidence package has no blocking failures and the user explicitly opens the Manual 1Panel Deploy Gate.
+Do not continue to `1Panel Compose Setup` until the sanitized evidence package has no blocking failures and the user explicitly opens the Manual 1Panel Deploy Gate. Use [Manual 1Panel Deploy Gate](./1panel-manual-deploy-gate.md) to capture the required human confirmations and post-deploy evidence.
 
 ## Secret Files
 
@@ -212,7 +212,7 @@ LOG_LEVEL=WARNING
 
 ## 1Panel Compose Setup
 
-Only start this section after the Manual 1Panel Deploy Gate is opened. A human operator performs the 1Panel action; Release Agent may coordinate approvals and external Feishu/GitHub workflows, but must not operate the server directly.
+Only start this section after the Manual 1Panel Deploy Gate is opened. A human operator performs the 1Panel action; Release Agent may coordinate approvals and external Feishu/GitHub workflows, but must not operate the server directly. Keep the deploy result in the evidence template from [Manual 1Panel Deploy Gate](./1panel-manual-deploy-gate.md).
 
 In 1Panel:
 
