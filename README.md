@@ -96,6 +96,12 @@ cd services
 
 控制面使用的 Bot App 还需要应用身份权限：`base:record:read`、`base:record:create`，并能访问该 Base。
 
+补权限后验证读写闭环：
+
+```powershell
+.\verify-control-plane.ps1
+```
+
 ## 一次启动两个服务
 
 ```powershell
