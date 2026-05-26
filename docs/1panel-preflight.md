@@ -2,6 +2,8 @@
 
 Use this checklist before moving the local Agent team services to a 1Panel-managed server.
 
+This checklist enters the **Manual 1Panel Deploy Gate** only after read-only evidence is reviewed, off-host backup/rollback ownership is confirmed, and the user explicitly approves a deployment window. The gate is not remote CI/CD access and does not authorize Agent-run server operations.
+
 ## Deployment Goal
 
 Run two long-lived services:
@@ -102,7 +104,7 @@ pwsh ./1panel-readonly-precheck.ps1 `
   -Json
 ```
 
-Do not continue to `1Panel Compose Setup` until the sanitized evidence package has no blocking failures and the user explicitly approves the next stage.
+Do not continue to `1Panel Compose Setup` until the sanitized evidence package has no blocking failures and the user explicitly opens the Manual 1Panel Deploy Gate.
 
 ## Secret Files
 
@@ -210,7 +212,7 @@ LOG_LEVEL=WARNING
 
 ## 1Panel Compose Setup
 
-Only start this section after the read-only gate above is approved.
+Only start this section after the Manual 1Panel Deploy Gate is opened. A human operator performs the 1Panel action; Release Agent may coordinate approvals and external Feishu/GitHub workflows, but must not operate the server directly.
 
 In 1Panel:
 

@@ -2,6 +2,8 @@
 
 Use this runbook before any formal 1Panel deployment or release. This stage is evidence collection only.
 
+The next stage after a passing evidence review is **Manual 1Panel Deploy Gate**. That gate authorizes only a human-operated 1Panel deployment window after explicit user approval; it does not authorize Agent-run server operations or remote CI/CD deployment.
+
 ## Release Gate
 
 | Gate | Status | Notes |
@@ -10,7 +12,8 @@ Use this runbook before any formal 1Panel deployment or release. This stage is e
 | Local Docker runtime/adapter monitoring | Pass | `monitor-services.ps1 -Docker` passed against the local Docker stack. |
 | First project trial | Conditional pass | QA allowed the pre-deploy evidence checklist and server read-only pre-check. |
 | 1Panel server read-only pre-check | Pending | Must be executed on the target server before deployment. |
-| Formal deployment or release | Blocked | Requires reviewed evidence and explicit user approval. |
+| Manual 1Panel Deploy Gate | Blocked | Requires reviewed evidence, off-host backup/rollback confirmation, and explicit user approval. |
+| Formal deployment or release | Blocked | Requires the Manual 1Panel Deploy Gate to open first. |
 | Automatic multi-Agent rich mention relay | Blocked for unattended operation | Agents can write plain text/Markdown `@Agent`, but cannot yet emit a real Feishu rich-text mention that triggers the next Bot. |
 
 ## Forbidden Operations
@@ -21,7 +24,7 @@ Do not run these during this stage:
 - `docker run`, `create`, `rm`, or container deletion
 - 1Panel app start, stop, restart, recreate, redeploy, or settings writes
 - writes to `.env`, `agent-runtime-config.json`, runtime data, adapter status, or server configuration
-- publishing, release announcement, production traffic migration, or formal go-live
+- publishing, release announcement, production traffic migration, formal go-live, remote CI/CD deployment, or Agent-run server operation
 - printing or copying raw secrets, app secrets, tokens, `chat_id`, `open_id`, or `message_id` into reports
 
 ## Server Preconditions
@@ -257,13 +260,13 @@ Paste only sanitized summary fields:
 
 ## Risks And Blockers
 
-- Formal deployment is still blocked until this evidence is reviewed and approved.
+- Formal deployment is still blocked until this evidence is reviewed and the Manual 1Panel Deploy Gate is explicitly opened.
 - Automatic multi-Agent relay is not fully unattended until real Feishu rich-text mention generation is implemented.
 - Off-host backup target and rollback owner must be confirmed before deployment.
 
 ## Release Recommendation
 
-- Recommended next stage:
+- Recommended next stage: Manual 1Panel Deploy Gate
 - Conditions:
 - Explicitly forbidden actions that remain forbidden:
 ```
@@ -286,13 +289,15 @@ Use counts, booleans, timestamps, and status names instead of raw values.
 
 ## Next Stage Entry Criteria
 
-All of these must be true before formal deployment work can be considered:
+All of these must be true before the Manual 1Panel Deploy Gate can open:
 
 - read-only pre-check has no blocking failures
 - evidence package has been reviewed and approved by the user
 - off-host backup target and rollback owner are known
 - server private files are present and permissions are acceptable
 - Docker/Compose config validates on the target server
-- formal deployment is explicitly requested after the evidence review
+- formal deployment is explicitly requested by the user after the evidence review
+
+This gate is still manual. Release Agent may request approval, prepare the checklist, and trigger Feishu or GitHub workflows for adjacent systems, but it must not SSH into the 1Panel server, write server configuration, start/restart containers, or perform the deployment itself.
 
 Even after server pre-check passes, the final release remains blocked until a post-deploy real Feishu 8 Agent E2E gate passes in the target environment.

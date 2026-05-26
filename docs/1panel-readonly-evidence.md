@@ -6,6 +6,7 @@
 - Scope: read-only evidence collection only
 - Target server: read-only pre-check executed; no blocking failures found
 - Local verification mode: Docker runtime/adapter already running
+- Next stage: Manual 1Panel Deploy Gate
 - Formal deployment: blocked
 
 ## Release Gate State
@@ -19,7 +20,8 @@
 | Local PowerShell read-only pre-check script | Pass | `pass=16`, `warn=0`, `fail=0`, `not_verified=2`. |
 | Local running-service strict pre-check | Pass | Bash and PowerShell both passed with `--require-compose-services`, runtime health required, adapter connected required, and local mapped port `18080` required listening. |
 | Target 1Panel server read-only pre-check | Conditional pass | `pass=13`, `warn=1`, `fail=0`, `not_verified=4`; `ok=true`; no blocking failures reported by the read-only pre-check. |
-| Formal deployment/release | Blocked | Requires evidence review, off-host backup/rollback confirmation, and explicit user approval before any deployment action. |
+| Manual 1Panel Deploy Gate | Blocked | Allows only a human-operated 1Panel deployment window after evidence review, off-host backup/rollback confirmation, and explicit user approval. It does not authorize Agent-run server operations or remote CI/CD deployment. |
+| Formal deployment/release | Blocked | Requires the Manual 1Panel Deploy Gate to open before any deployment action. |
 
 ## Commands Run Locally
 
@@ -91,7 +93,7 @@ Source summary:
 | Logs | Pass | 2 services checked, problem line count `0`; raw logs suppressed. |
 | Backup inventory | Pass | 7 backup candidates checked, 4 exist; contents suppressed. |
 | Off-host backup target | Not verified | Operator confirmation still required. |
-| Formal deploy approval | Not verified | Still blocked until evidence is reviewed, backup/rollback ownership is confirmed, and user explicitly approves deployment stage. |
+| Formal deploy approval | Not verified | Still blocked until evidence is reviewed, backup/rollback ownership is confirmed, and the user explicitly opens the Manual 1Panel Deploy Gate. |
 
 ### Target Blocking Failures
 
@@ -110,7 +112,7 @@ Source summary:
 | docker | compose ps | No Compose containers are currently associated with this file. |
 | network | runtime health | Runtime health endpoint is not reachable. |
 | rollback | external backup target | Operator must confirm the off-host backup target and rollback owner before deployment. |
-| release_gate | formal deploy | Formal deployment remains blocked until sanitized evidence is reviewed and explicitly approved. |
+| release_gate | formal deploy | Formal deployment remains blocked until sanitized evidence is reviewed and the Manual 1Panel Deploy Gate is explicitly opened. |
 
 ### Target Re-Check Command
 
@@ -145,12 +147,13 @@ bash ./1panel-readonly-precheck.sh \
 
 ## Risks And Blockers
 
-- Formal deployment and release are still blocked.
+- Formal deployment and release are still blocked until the Manual 1Panel Deploy Gate opens.
 - The target 1Panel server read-only pre-check now reports no blocking failures.
 - Adapter worker status is still a warning because services are not running and no status files exist in pre-deploy mode.
 - Runtime health is not verified because the runtime service is not running in pre-deploy mode.
 - Compose containers are not associated with the file yet; this is expected before formal deployment but remains unverified runtime state.
 - Off-host backup target and rollback owner remain operator-confirmed items.
+- The next stage is not remote CI/CD access. Release Agent may coordinate Feishu approvals or GitHub workflows for other systems, but must not operate this 1Panel server.
 - Agents still cannot emit real Feishu rich-text mentions for automatic multi-Agent relay; unattended cross-Agent handoff requires later orchestration work.
 
 ## Forbidden Actions Still In Effect
@@ -163,4 +166,4 @@ bash ./1panel-readonly-precheck.sh \
 
 ## Recommendation
 
-The read-only evidence can move to review. Do not proceed to formal deployment until off-host backup/rollback ownership is confirmed and the user explicitly approves the next stage. Until then, deployment, restart, recreate, build, pull, and production configuration write operations remain forbidden.
+The read-only evidence can move to review. The recommended next stage is Manual 1Panel Deploy Gate. Do not proceed to formal deployment until off-host backup/rollback ownership is confirmed and the user explicitly opens that gate. Until then, deployment, restart, recreate, build, pull, and production configuration write operations remain forbidden.
