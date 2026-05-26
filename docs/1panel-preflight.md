@@ -26,6 +26,7 @@ Tracked files to upload or pull on the server:
 ```text
 docker-compose.full.yml
 README.md
+1panel-readonly-precheck.ps1
 monitor-services.ps1
 smoke-services.ps1
 docs/
@@ -42,6 +43,37 @@ feishu-channel-adapter/.venv/
 feishu-agent-runtime/data/
 feishu-channel-adapter/status/
 ```
+
+## Read-Only Gate Before Deployment
+
+Before opening the 1Panel Compose setup, complete the read-only pre-check and evidence package in [1Panel Read-Only Pre-Check](./1panel-readonly-precheck.md).
+
+This gate is mandatory because the current release status only allows:
+
+```text
+1Panel deployment evidence checklist + server read-only pre-check
+```
+
+It still forbids:
+
+- formal deployment or release
+- 1Panel start/stop/restart/recreate
+- `docker compose up`, `down`, `restart`, `pull`, or `build`
+- writes to `.env`, `agent-runtime-config.json`, runtime data, adapter status, or server settings
+- printing raw secrets, tokens, app secrets, real private Feishu IDs, SQLite files, or raw logs
+
+Run from the server deployment directory:
+
+```powershell
+pwsh ./1panel-readonly-precheck.ps1 `
+  -RootPath . `
+  -BaseUrl http://127.0.0.1:8080 `
+  -AdapterStatusDir ./feishu-channel-adapter/status `
+  -PortMode ReportOnly `
+  -Json
+```
+
+Do not continue to `1Panel Compose Setup` until the sanitized evidence package has no blocking failures and the user explicitly approves the next stage.
 
 ## Secret Files
 
@@ -148,6 +180,8 @@ LOG_LEVEL=WARNING
 ```
 
 ## 1Panel Compose Setup
+
+Only start this section after the read-only gate above is approved.
 
 In 1Panel:
 
