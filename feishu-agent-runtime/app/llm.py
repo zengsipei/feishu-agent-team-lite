@@ -41,6 +41,9 @@ def build_completion_user_message(*, user_text: str, metadata: dict) -> str:
         "- handoff.text is the task payload for the next agent. Do not include Feishu <at> tags, @Agent trigger text, "
         "open_id, app_id, or bot_id. The channel adapter will send the real rich-text @.\n"
         "- If no next agent should continue, set handoff to null.\n"
+        "- Optional self-improvement: include prompt_proposal only when you have a concrete shorter/better system prompt "
+        "candidate for your own role. This creates a Feishu Prompt Versions candidate only; it does not activate it.\n"
+        '- prompt_proposal schema: {"title":"...","reason":"...","prompt_text":"..."} or null.\n'
         f"- Available handoff target agent ids: {available_agent_ids_json}\n\n"
         f"User message:\n{user_text}"
     )

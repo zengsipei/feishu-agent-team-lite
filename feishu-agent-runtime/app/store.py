@@ -1,5 +1,6 @@
 import json
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 from typing import Any
 
@@ -18,52 +19,53 @@ class RuntimeStore:
         return conn
 
     def init_schema(self) -> None:
-        with self.connect() as conn:
-            conn.executescript(
-                """
-                CREATE TABLE IF NOT EXISTS sessions (
-                    id TEXT PRIMARY KEY,
-                    project_id TEXT NOT NULL,
-                    chat_id TEXT NOT NULL,
-                    thread_id TEXT,
-                    sender_id TEXT,
-                    agent_id TEXT NOT NULL,
-                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    metadata_json TEXT NOT NULL DEFAULT '{}'
-                );
+        with closing(self.connect()) as conn:
+            with conn:
+                conn.executescript(
+                    """
+                    CREATE TABLE IF NOT EXISTS sessions (
+                        id TEXT PRIMARY KEY,
+                        project_id TEXT NOT NULL,
+                        chat_id TEXT NOT NULL,
+                        thread_id TEXT,
+                        sender_id TEXT,
+                        agent_id TEXT NOT NULL,
+                        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        metadata_json TEXT NOT NULL DEFAULT '{}'
+                    );
 
-                CREATE TABLE IF NOT EXISTS messages (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    session_id TEXT NOT NULL,
-                    role TEXT NOT NULL,
-                    content TEXT NOT NULL,
-                    source_type TEXT NOT NULL DEFAULT 'channel',
-                    source_id TEXT,
-                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    metadata_json TEXT NOT NULL DEFAULT '{}',
-                    FOREIGN KEY(session_id) REFERENCES sessions(id)
-                );
+                    CREATE TABLE IF NOT EXISTS messages (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        session_id TEXT NOT NULL,
+                        role TEXT NOT NULL,
+                        content TEXT NOT NULL,
+                        source_type TEXT NOT NULL DEFAULT 'channel',
+                        source_id TEXT,
+                        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        metadata_json TEXT NOT NULL DEFAULT '{}',
+                        FOREIGN KEY(session_id) REFERENCES sessions(id)
+                    );
 
-                CREATE TABLE IF NOT EXISTS events (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    event_id TEXT,
-                    event_type TEXT NOT NULL,
-                    project_id TEXT,
-                    chat_id TEXT,
-                    agent_id TEXT,
-                    payload_json TEXT NOT NULL,
-                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-                );
+                    CREATE TABLE IF NOT EXISTS events (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        event_id TEXT,
+                        event_type TEXT NOT NULL,
+                        project_id TEXT,
+                        chat_id TEXT,
+                        agent_id TEXT,
+                        payload_json TEXT NOT NULL,
+                        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    );
 
-                CREATE UNIQUE INDEX IF NOT EXISTS idx_events_event_id
-                    ON events(event_id)
-                    WHERE event_id IS NOT NULL AND event_id != '';
+                    CREATE UNIQUE INDEX IF NOT EXISTS idx_events_event_id
+                        ON events(event_id)
+                        WHERE event_id IS NOT NULL AND event_id != '';
 
-                CREATE INDEX IF NOT EXISTS idx_messages_session_created
-                    ON messages(session_id, created_at);
-                """
-            )
+                    CREATE INDEX IF NOT EXISTS idx_messages_session_created
+                        ON messages(session_id, created_at);
+                    """
+                )
 
     def session_id_for(
         self,
@@ -88,27 +90,28 @@ class RuntimeStore:
         agent_id: str,
         metadata: dict[str, Any] | None = None,
     ) -> None:
-        with self.connect() as conn:
-            conn.execute(
-                """
-                INSERT INTO sessions (
-                    id, project_id, chat_id, thread_id, sender_id, agent_id, metadata_json
+        with closing(self.connect()) as conn:
+            with conn:
+                conn.execute(
+                    """
+                    INSERT INTO sessions (
+                        id, project_id, chat_id, thread_id, sender_id, agent_id, metadata_json
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(id) DO UPDATE SET
+                        updated_at = CURRENT_TIMESTAMP,
+                        metadata_json = excluded.metadata_json
+                    """,
+                    (
+                        session_id,
+                        project_id,
+                        chat_id,
+                        thread_id,
+                        sender_id,
+                        agent_id,
+                        json.dumps(metadata or {}, ensure_ascii=False),
+                    ),
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(id) DO UPDATE SET
-                    updated_at = CURRENT_TIMESTAMP,
-                    metadata_json = excluded.metadata_json
-                """,
-                (
-                    session_id,
-                    project_id,
-                    chat_id,
-                    thread_id,
-                    sender_id,
-                    agent_id,
-                    json.dumps(metadata or {}, ensure_ascii=False),
-                ),
-            )
 
     def record_event(
         self,
@@ -121,21 +124,22 @@ class RuntimeStore:
         payload: dict[str, Any],
     ) -> bool:
         try:
-            with self.connect() as conn:
-                conn.execute(
-                    """
-                    INSERT INTO events (event_id, event_type, project_id, chat_id, agent_id, payload_json)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        event_id,
-                        event_type,
-                        project_id,
-                        chat_id,
-                        agent_id,
-                        json.dumps(payload, ensure_ascii=False),
-                    ),
-                )
+            with closing(self.connect()) as conn:
+                with conn:
+                    conn.execute(
+                        """
+                        INSERT INTO events (event_id, event_type, project_id, chat_id, agent_id, payload_json)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            event_id,
+                            event_type,
+                            project_id,
+                            chat_id,
+                            agent_id,
+                            json.dumps(payload, ensure_ascii=False),
+                        ),
+                    )
             return True
         except sqlite3.IntegrityError:
             return False
@@ -150,29 +154,30 @@ class RuntimeStore:
         source_id: str | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> int:
-        with self.connect() as conn:
-            cur = conn.execute(
-                """
-                INSERT INTO messages (session_id, role, content, source_type, source_id, metadata_json)
-                VALUES (?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    session_id,
-                    role,
-                    content,
-                    source_type,
-                    source_id,
-                    json.dumps(metadata or {}, ensure_ascii=False),
-                ),
-            )
-            conn.execute(
-                "UPDATE sessions SET updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                (session_id,),
-            )
-            return int(cur.lastrowid)
+        with closing(self.connect()) as conn:
+            with conn:
+                cur = conn.execute(
+                    """
+                    INSERT INTO messages (session_id, role, content, source_type, source_id, metadata_json)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        session_id,
+                        role,
+                        content,
+                        source_type,
+                        source_id,
+                        json.dumps(metadata or {}, ensure_ascii=False),
+                    ),
+                )
+                conn.execute(
+                    "UPDATE sessions SET updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    (session_id,),
+                )
+                return int(cur.lastrowid)
 
     def recent_messages(self, session_id: str, limit: int) -> list[dict[str, Any]]:
-        with self.connect() as conn:
+        with closing(self.connect()) as conn:
             rows = conn.execute(
                 """
                 SELECT role, content, source_type, source_id, metadata_json, created_at

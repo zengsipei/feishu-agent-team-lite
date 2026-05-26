@@ -75,6 +75,27 @@ Copy-Item .agents\teams\code-rd-agent-team\.runtime\agent-runtime-config.json se
 
 真实文件应包含 8 个 `apps[]` 项，每个 `app_id` / `app_secret` 对应一个独立飞书 Bot App。
 
+## Feishu Control Plane
+
+可选启用飞书 Base 作为 Agent Memory 控制面。服务仍保持轻量：runtime 只读当前 Agent prompt，并把运行摘要和 prompt 候选写回 Base。
+
+最小表：
+
+- `Agents`：`Agent ID`、`Agent Name`、`Status`、`Current Prompt Version`、`Current Prompt`。
+- `Prompt Versions`：Agent 自进化候选，默认只写 `Proposed`，不会自动启用。
+- `Agent Runs`：每次运行的摘要、状态、handoff 目标和 prompt 来源。
+
+初始化或补权限后重跑：
+
+```powershell
+cd services
+.\init-control-plane.ps1 -Json
+```
+
+脚本会创建 3 张表并把 8 个本地 prompt 种子写入 `Agents`，然后生成 gitignored 的 `.local-run/control-plane-runtime.env`。把其中的 `CONTROL_PLANE_*` 填入 `feishu-agent-runtime/.env` 后再启用。
+
+控制面使用的 Bot App 还需要应用身份权限：`base:record:read`、`base:record:create`，并能访问该 Base。
+
 ## 一次启动两个服务
 
 ```powershell

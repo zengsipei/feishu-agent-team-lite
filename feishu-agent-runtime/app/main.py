@@ -4,6 +4,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
 
 from .agents import AgentRegistry
 from .config import Settings, get_settings
+from .control_plane import FeishuBaseControlPlane, NullControlPlane
 from .llm import OpenAICompatibleClient
 from .models import AgentSummary, CardAction, ChannelComment, ChannelMessage, RuntimeReply
 from .runtime import AgentRuntime
@@ -34,11 +35,39 @@ def build_runtime(settings: Settings) -> AgentRuntime:
         max_retries=settings.openai_max_retries,
         retry_backoff_seconds=settings.openai_retry_backoff_seconds,
     )
+    control_plane = build_control_plane(settings)
     return AgentRuntime(
         registry=registry,
         store=store,
         llm=llm,
         max_context_messages=settings.max_context_messages,
+        control_plane=control_plane,
+    )
+
+
+def build_control_plane(settings: Settings):
+    if not settings.control_plane_enabled:
+        return NullControlPlane()
+    required = {
+        "CONTROL_PLANE_APP_ID": settings.control_plane_app_id,
+        "CONTROL_PLANE_APP_SECRET": settings.control_plane_app_secret,
+        "CONTROL_PLANE_BASE_TOKEN": settings.control_plane_base_token,
+        "CONTROL_PLANE_AGENTS_TABLE_ID": settings.control_plane_agents_table_id,
+        "CONTROL_PLANE_PROMPT_VERSIONS_TABLE_ID": settings.control_plane_prompt_versions_table_id,
+        "CONTROL_PLANE_AGENT_RUNS_TABLE_ID": settings.control_plane_agent_runs_table_id,
+    }
+    missing = [key for key, value in required.items() if not value]
+    if missing:
+        raise RuntimeError(f"Control Plane is enabled but missing required config keys: {', '.join(missing)}")
+    return FeishuBaseControlPlane(
+        base_url=settings.control_plane_base_url,
+        app_id=settings.control_plane_app_id,
+        app_secret=settings.control_plane_app_secret,
+        base_token=settings.control_plane_base_token,
+        agents_table_id=settings.control_plane_agents_table_id,
+        prompt_versions_table_id=settings.control_plane_prompt_versions_table_id,
+        agent_runs_table_id=settings.control_plane_agent_runs_table_id,
+        timeout_seconds=settings.control_plane_timeout_seconds,
     )
 
 
@@ -47,7 +76,10 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
     settings.data_dir.mkdir(parents=True, exist_ok=True)
     app.state.runtime = build_runtime(settings)
-    yield
+    try:
+        yield
+    finally:
+        await app.state.runtime.close()
 
 
 app = FastAPI(title="Feishu Agent Runtime", version="0.1.0", lifespan=lifespan)

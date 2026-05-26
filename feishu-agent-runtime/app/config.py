@@ -32,6 +32,16 @@ class Settings(BaseSettings):
     openai_retry_backoff_seconds: float = 1.0
     max_context_messages: int = 24
 
+    control_plane_enabled: bool = False
+    control_plane_base_url: str = "https://open.feishu.cn"
+    control_plane_app_id: str = ""
+    control_plane_app_secret: str = ""
+    control_plane_base_token: str = ""
+    control_plane_agents_table_id: str = ""
+    control_plane_prompt_versions_table_id: str = ""
+    control_plane_agent_runs_table_id: str = ""
+    control_plane_timeout_seconds: float = 20.0
+
     @property
     def resolved_database_path(self) -> Path:
         if self.database_path is not None:

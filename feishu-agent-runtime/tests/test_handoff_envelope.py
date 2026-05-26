@@ -1,6 +1,6 @@
 import unittest
 
-from app.runtime import parse_reply_envelope
+from app.runtime import parse_reply_envelope, parse_reply_envelope_with_proposal
 
 
 class HandoffEnvelopeTests(unittest.TestCase):
@@ -72,6 +72,44 @@ class HandoffEnvelopeTests(unittest.TestCase):
         self.assertEqual(reply_text, raw)
         self.assertIsNone(handoff)
         self.assertFalse(parsed)
+
+    def test_prompt_proposal_is_parsed_without_changing_legacy_contract(self) -> None:
+        raw = (
+            '{"reply_text":"建议已生成","handoff":null,'
+            '"prompt_proposal":{"title":"更短提示词","reason":"减少噪音","prompt_text":"作为 Coding Agent，先确认权限。"}}'
+        )
+
+        legacy_reply_text, legacy_handoff, legacy_parsed = parse_reply_envelope(
+            raw,
+            current_agent_id="coding",
+            available_agent_ids={"review"},
+        )
+        reply_text, handoff, proposal, parsed = parse_reply_envelope_with_proposal(
+            raw,
+            current_agent_id="coding",
+            available_agent_ids={"review"},
+        )
+
+        self.assertEqual(legacy_reply_text, "建议已生成")
+        self.assertIsNone(legacy_handoff)
+        self.assertTrue(legacy_parsed)
+        self.assertEqual(reply_text, "建议已生成")
+        self.assertIsNone(handoff)
+        self.assertIsNotNone(proposal)
+        self.assertEqual(proposal.title, "更短提示词")
+        self.assertEqual(proposal.reason, "减少噪音")
+        self.assertEqual(proposal.prompt_text, "作为 Coding Agent，先确认权限。")
+        self.assertTrue(parsed)
+
+    def test_invalid_prompt_proposal_is_ignored(self) -> None:
+        _reply_text, _handoff, proposal, parsed = parse_reply_envelope_with_proposal(
+            '{"reply_text":"收到","handoff":null,"prompt_proposal":{"title":"bad"}}',
+            current_agent_id="coding",
+            available_agent_ids={"review"},
+        )
+
+        self.assertIsNone(proposal)
+        self.assertTrue(parsed)
 
 
 if __name__ == "__main__":
