@@ -1,0 +1,15 @@
+services:
+  feishu-channel-adapter:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: feishu-channel-adapter:latest
+    container_name: feishu-channel-adapter
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      ADAPTER_STATUS_DIR: /app/status
+    volumes:
+      - ./config/agent-runtime-config.json:/app/config/agent-runtime-config.json:ro
+      - ./status:/app/status
