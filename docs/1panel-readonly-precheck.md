@@ -51,7 +51,18 @@ feishu-channel-adapter/status/
 
 ## Run The Read-Only Pre-Check
 
-From the server deployment directory:
+From the server deployment directory, prefer the Bash script on Linux/1Panel:
+
+```bash
+bash ./1panel-readonly-precheck.sh \
+  --root-path . \
+  --base-url http://127.0.0.1:8080 \
+  --adapter-status-dir ./feishu-channel-adapter/status \
+  --port-mode ReportOnly \
+  --json
+```
+
+If PowerShell is already available, the equivalent command is:
 
 ```powershell
 pwsh ./1panel-readonly-precheck.ps1 `
@@ -64,6 +75,18 @@ pwsh ./1panel-readonly-precheck.ps1 `
 
 If the services are already running and the operator wants runtime/container state to be required:
 
+```bash
+bash ./1panel-readonly-precheck.sh \
+  --root-path . \
+  --base-url http://127.0.0.1:8080 \
+  --adapter-status-dir ./feishu-channel-adapter/status \
+  --require-compose-services \
+  --require-runtime-health \
+  --require-adapter-connected \
+  --port-mode RequireListening \
+  --json
+```
+
 ```powershell
 pwsh ./1panel-readonly-precheck.ps1 `
   -RootPath . `
@@ -71,13 +94,21 @@ pwsh ./1panel-readonly-precheck.ps1 `
   -AdapterStatusDir ./feishu-channel-adapter/status `
   -RequireComposeServices `
   -RequireRuntimeHealth `
+  -RequireAdapterConnected `
   -PortMode RequireListening `
   -Json
 ```
 
-For a pre-deploy server where services have not been started yet, keep `-PortMode ReportOnly` and do not use `-RequireComposeServices` or `-RequireRuntimeHealth`.
+For a pre-deploy server where services have not been started yet, keep `ReportOnly` and do not require Compose services, runtime health, or adapter connectivity.
 
 Optional provider connectivity probe:
+
+```bash
+bash ./1panel-readonly-precheck.sh \
+  --root-path . \
+  --network-probe-url https://api.openai.com/v1 \
+  --json
+```
 
 ```powershell
 pwsh ./1panel-readonly-precheck.ps1 `
@@ -129,6 +160,7 @@ Do not paste raw `.env`, raw runtime config, raw status files, or raw logs into 
 
 | Command summary | Result | Notes |
 | --- | --- | --- |
+| `bash ./1panel-readonly-precheck.sh ...` | pass/fail | Preferred on Linux/1Panel; JSON saved locally, secrets suppressed |
 | `pwsh ./1panel-readonly-precheck.ps1 ...` | pass/fail | JSON saved locally, secrets suppressed |
 | `pwsh ./monitor-services.ps1 -Docker ...` | pass/fail/not run | Run only if services are already running |
 

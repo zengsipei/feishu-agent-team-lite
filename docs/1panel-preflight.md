@@ -26,6 +26,7 @@ Tracked files to upload or pull on the server:
 ```text
 docker-compose.full.yml
 README.md
+1panel-readonly-precheck.sh
 1panel-readonly-precheck.ps1
 monitor-services.ps1
 smoke-services.ps1
@@ -62,7 +63,18 @@ It still forbids:
 - writes to `.env`, `agent-runtime-config.json`, runtime data, adapter status, or server settings
 - printing raw secrets, tokens, app secrets, real private Feishu IDs, SQLite files, or raw logs
 
-Run from the server deployment directory:
+Run from the server deployment directory. Prefer Bash on Linux/1Panel:
+
+```bash
+bash ./1panel-readonly-precheck.sh \
+  --root-path . \
+  --base-url http://127.0.0.1:8080 \
+  --adapter-status-dir ./feishu-channel-adapter/status \
+  --port-mode ReportOnly \
+  --json
+```
+
+PowerShell fallback:
 
 ```powershell
 pwsh ./1panel-readonly-precheck.ps1 `

@@ -15,7 +15,8 @@
 | Local Docker adapter 8 Agent E2E | Pass | Completed before this evidence package. |
 | Local Docker runtime/adapter monitor | Pass | `monitor-services.ps1 -Docker` re-check passed locally; raw output is not included because it contains real app IDs and local paths. |
 | Project trial QA | Conditional pass | Allows only 1Panel evidence checklist and server read-only pre-check. |
-| Local read-only pre-check script | Pass | `pass=16`, `warn=0`, `fail=0`, `not_verified=2`. |
+| Local Bash read-only pre-check script | Pass | `pass=16`, `warn=0`, `fail=0`, `not_verified=2`; strict JSON parse passed. |
+| Local PowerShell read-only pre-check script | Pass | `pass=16`, `warn=0`, `fail=0`, `not_verified=2`. |
 | Target 1Panel server read-only pre-check | Pending | Must be run on `/opt/feishu-agent-team` or the chosen deployment directory. |
 | Formal deployment/release | Blocked | Requires reviewed server evidence and explicit user approval. |
 
@@ -23,6 +24,7 @@
 
 | Command summary | Result | Sanitization |
 | --- | --- | --- |
+| `bash ./1panel-readonly-precheck.sh --root-path . --base-url http://127.0.0.1:18080 --adapter-status-dir ./feishu-channel-adapter/status --port-mode ReportOnly --json` | Pass | Env values, app secrets, app IDs, raw status content, and raw logs suppressed; output validated with a strict JSON parser. |
 | `pwsh -NoProfile -File ./1panel-readonly-precheck.ps1 -RootPath . -BaseUrl http://127.0.0.1:18080 -AdapterStatusDir ./feishu-channel-adapter/status -PortMode ReportOnly -Json` | Pass | Env values, app secrets, app IDs, raw status content, and raw logs suppressed. |
 | `pwsh -NoProfile -File ./monitor-services.ps1 -Docker -BaseUrl http://127.0.0.1:18080 -AdapterStatusDir ./feishu-channel-adapter/status -Json` | Pass | Raw output excluded from evidence because it includes real app IDs and local paths. |
 | PowerShell parser check for `1panel-readonly-precheck.ps1`, `smoke-services.ps1`, and `monitor-services.ps1` | Pass | Syntax only. |
@@ -50,6 +52,15 @@
 
 Run from the target deployment directory, without starting, restarting, recreating, or modifying services:
 
+```bash
+bash ./1panel-readonly-precheck.sh \
+  --root-path . \
+  --base-url http://127.0.0.1:8080 \
+  --adapter-status-dir ./feishu-channel-adapter/status \
+  --port-mode ReportOnly \
+  --json
+```
+
 ```powershell
 pwsh ./1panel-readonly-precheck.ps1 `
   -RootPath . `
@@ -60,6 +71,18 @@ pwsh ./1panel-readonly-precheck.ps1 `
 ```
 
 If the target services are already running and the operator wants runtime state enforced:
+
+```bash
+bash ./1panel-readonly-precheck.sh \
+  --root-path . \
+  --base-url http://127.0.0.1:8080 \
+  --adapter-status-dir ./feishu-channel-adapter/status \
+  --require-compose-services \
+  --require-runtime-health \
+  --require-adapter-connected \
+  --port-mode RequireListening \
+  --json
+```
 
 ```powershell
 pwsh ./1panel-readonly-precheck.ps1 `
