@@ -519,6 +519,45 @@ function Test-PortState {
                 $method = "netstat"
                 $listening = (@($rows | Select-String -Pattern (":$port\s+.*LISTEN")).Count -gt 0)
             }
+
+            if ($listening -eq $false) {
+                $connectHosts = New-Object System.Collections.Generic.List[string]
+                try {
+                    $baseUri = [uri]$BaseUrl
+                    if ($baseUri.Port -eq $port -and $baseUri.Host) {
+                        $connectHosts.Add($baseUri.Host) | Out-Null
+                    }
+                } catch {
+                    # Ignore invalid BaseUrl here; runtime health reports that separately.
+                }
+                foreach ($hostName in @("127.0.0.1", "localhost")) {
+                    if (-not $connectHosts.Contains($hostName)) {
+                        $connectHosts.Add($hostName) | Out-Null
+                    }
+                }
+
+                foreach ($hostName in $connectHosts) {
+                    $client = $null
+                    try {
+                        $client = [System.Net.Sockets.TcpClient]::new()
+                        $async = $client.BeginConnect($hostName, $port, $null, $null)
+                        if ($async.AsyncWaitHandle.WaitOne(1000)) {
+                            $client.EndConnect($async)
+                            if ($client.Connected) {
+                                $listening = $true
+                                $method = "$method+TcpClient"
+                                break
+                            }
+                        }
+                    } catch {
+                        $errorText = $_.Exception.Message
+                    } finally {
+                        if ($client) {
+                            $client.Dispose()
+                        }
+                    }
+                }
+            }
         } catch {
             $errorText = $_.Exception.Message
         }

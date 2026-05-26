@@ -17,6 +17,7 @@
 | Project trial QA | Conditional pass | Allows only 1Panel evidence checklist and server read-only pre-check. |
 | Local Bash read-only pre-check script | Pass | `pass=16`, `warn=0`, `fail=0`, `not_verified=2`; strict JSON parse passed. |
 | Local PowerShell read-only pre-check script | Pass | `pass=16`, `warn=0`, `fail=0`, `not_verified=2`. |
+| Local running-service strict pre-check | Pass | Bash and PowerShell both passed with `--require-compose-services`, runtime health required, adapter connected required, and local mapped port `18080` required listening. |
 | Target 1Panel server read-only pre-check | Pending | Must be run on `/opt/feishu-agent-team` or the chosen deployment directory. |
 | Formal deployment/release | Blocked | Requires reviewed server evidence and explicit user approval. |
 
@@ -26,8 +27,13 @@
 | --- | --- | --- |
 | `bash ./1panel-readonly-precheck.sh --root-path . --base-url http://127.0.0.1:18080 --adapter-status-dir ./feishu-channel-adapter/status --port-mode ReportOnly --json` | Pass | Env values, app secrets, app IDs, raw status content, and raw logs suppressed; output validated with a strict JSON parser. |
 | `pwsh -NoProfile -File ./1panel-readonly-precheck.ps1 -RootPath . -BaseUrl http://127.0.0.1:18080 -AdapterStatusDir ./feishu-channel-adapter/status -PortMode ReportOnly -Json` | Pass | Env values, app secrets, app IDs, raw status content, and raw logs suppressed. |
+| `bash ./1panel-readonly-precheck.sh --root-path . --base-url http://127.0.0.1:18080 --adapter-status-dir ./feishu-channel-adapter/status --ports 18080 --require-compose-services --require-runtime-health --require-adapter-connected --port-mode RequireListening --json` | Pass | `pass=16`, `warn=0`, `fail=0`, `not_verified=2`; running Docker services were only read. |
+| `pwsh -NoProfile -File ./1panel-readonly-precheck.ps1 -RootPath . -BaseUrl http://127.0.0.1:18080 -AdapterStatusDir ./feishu-channel-adapter/status -Ports 18080 -RequireComposeServices -RequireRuntimeHealth -RequireAdapterConnected -PortMode RequireListening -Json` | Pass | `pass=16`, `warn=0`, `fail=0`, `not_verified=2`; Windows Docker Desktop port exposure was verified with read-only TCP connect fallback after listener table lookup. |
 | `pwsh -NoProfile -File ./monitor-services.ps1 -Docker -BaseUrl http://127.0.0.1:18080 -AdapterStatusDir ./feishu-channel-adapter/status -Json` | Pass | Raw output excluded from evidence because it includes real app IDs and local paths. |
 | PowerShell parser check for `1panel-readonly-precheck.ps1`, `smoke-services.ps1`, and `monitor-services.ps1` | Pass | Syntax only. |
+| `bash -n ./1panel-readonly-precheck.sh` | Pass | Bash syntax only. |
+| `git diff --check` | Pass | No whitespace or patch formatting issues. |
+| Sensitive pattern scan over README, docs, and service scripts | Pass | Matches were limited to variable names or example commands; no real private IDs or secret values found. |
 
 ## Local Pre-Check Summary
 
@@ -39,7 +45,7 @@
 | Adapter env | Pass | Required key names present; values suppressed. |
 | Runtime config | Pass | JSON parse ok; 8 apps; 8 `agent_id`; 8 `app_id`; duplicate groups `0`; secret values suppressed. |
 | Docker/Compose | Pass | Docker and Compose available; compose config validates; 2 containers observed locally. |
-| Port state | Pass | Port policy was `ReportOnly`; no server write action. |
+| Port state | Pass | `ReportOnly` passed for local pre-check; strict local running-service check also passed with port `18080` required listening. |
 | Runtime health | Pass | Local `/health` reachable at `http://127.0.0.1:18080`. |
 | Network connectivity | Pass | Feishu Open Platform probe reached the target and received an HTTP response. |
 | Adapter status | Pass | 8 status files, 8 connected, 0 bad JSON; app IDs suppressed. |

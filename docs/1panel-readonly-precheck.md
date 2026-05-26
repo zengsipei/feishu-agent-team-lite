@@ -101,6 +101,8 @@ pwsh ./1panel-readonly-precheck.ps1 `
 
 For a pre-deploy server where services have not been started yet, keep `ReportOnly` and do not require Compose services, runtime health, or adapter connectivity.
 
+PowerShell port checks first read the local listener table. On Windows with Docker Desktop, a mapped container port can be reachable even when it is not visible as a normal `Get-NetTCPConnection` listener, so the script falls back to a short TCP connect probe against the `BaseUrl` host, `127.0.0.1`, and `localhost`. This is still a read-only connectivity check.
+
 Optional provider connectivity probe:
 
 ```bash
