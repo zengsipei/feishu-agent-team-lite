@@ -1,4 +1,5 @@
-config/
+config/*
+!config/.gitkeep
 .local-run/
 .env
 *.log

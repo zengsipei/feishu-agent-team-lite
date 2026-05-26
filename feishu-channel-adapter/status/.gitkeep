@@ -1,0 +1,1 @@
+# Keep the adapter status directory in git; worker status files stay ignored.

@@ -1,0 +1,1 @@
+# Keep the private config directory in git; runtime config files stay ignored.

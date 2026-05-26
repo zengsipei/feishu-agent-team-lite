@@ -1,6 +1,7 @@
 .env
 .venv/
-data/
+data/*
+!data/.gitkeep
 data-local/
 data-smoke/
 config/agent-runtime-config.json
