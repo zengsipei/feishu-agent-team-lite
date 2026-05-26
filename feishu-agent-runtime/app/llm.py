@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 from typing import Protocol
 
@@ -7,6 +8,26 @@ import httpx
 from .agents import AgentConfig
 
 logger = logging.getLogger(__name__)
+
+
+def build_completion_user_message(*, user_text: str, metadata: dict) -> str:
+    metadata_json = json.dumps(metadata, ensure_ascii=False, default=str)
+    available_agent_ids = metadata.get("available_agent_ids", [])
+    available_agent_ids_json = json.dumps(available_agent_ids, ensure_ascii=False, default=str)
+    return (
+        f"Project context metadata: {metadata_json}\n\n"
+        "Runtime response contract, required:\n"
+        "- Return only one valid JSON object. Do not wrap it in Markdown fences. Do not add prose outside JSON.\n"
+        '- Schema: {"reply_text":"...","handoff":null} or '
+        '{"reply_text":"...","handoff":{"to_agent_id":"architect","text":"..."}}.\n'
+        "- reply_text is the current agent's visible reply.\n"
+        "- handoff.to_agent_id must be one of metadata.available_agent_ids only.\n"
+        "- handoff.text is the task payload for the next agent. Do not include Feishu <at> tags, @Agent trigger text, "
+        "open_id, app_id, or bot_id. The channel adapter will send the real rich-text @.\n"
+        "- If no next agent should continue, set handoff to null.\n"
+        f"- Available handoff target agent ids: {available_agent_ids_json}\n\n"
+        f"User message:\n{user_text}"
+    )
 
 
 class LLMClient(Protocol):
@@ -56,14 +77,7 @@ class OpenAICompatibleClient:
         messages.append(
             {
                 "role": "user",
-                "content": (
-                    f"Project context metadata: {metadata}\n\n"
-                    "Response format: normally return plain text. If another agent should continue, "
-                    "return only strict JSON like "
-                    '{"reply_text":"...","handoff":{"to_agent_id":"architect","text":"..."}}. '
-                    "The handoff field may be null. Use only metadata.available_agent_ids for to_agent_id.\n\n"
-                    f"User message:\n{user_text}"
-                ),
+                "content": build_completion_user_message(user_text=user_text, metadata=metadata),
             }
         )
 

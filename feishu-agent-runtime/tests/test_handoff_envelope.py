@@ -28,6 +28,18 @@ class HandoffEnvelopeTests(unittest.TestCase):
         self.assertEqual(handoff.text, "请继续")
         self.assertTrue(parsed)
 
+    def test_json_code_fence_is_accepted(self) -> None:
+        reply_text, handoff, parsed = parse_reply_envelope(
+            '```json\n{"reply_text":"收到","handoff":{"to_agent_id":"architect","text":"请继续"}}\n```',
+            current_agent_id="rd-dispatcher",
+            available_agent_ids={"architect"},
+        )
+
+        self.assertEqual(reply_text, "收到")
+        self.assertIsNotNone(handoff)
+        self.assertEqual(handoff.to_agent_id, "architect")
+        self.assertTrue(parsed)
+
     def test_unknown_handoff_target_is_dropped(self) -> None:
         reply_text, handoff, parsed = parse_reply_envelope(
             '{"reply_text":"收到","handoff":{"to_agent_id":"unknown","text":"请继续"}}',

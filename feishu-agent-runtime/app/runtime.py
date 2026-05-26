@@ -185,8 +185,9 @@ def parse_reply_envelope(
     if not text:
         return "", None, False
 
+    json_text = strip_json_code_fence(text)
     try:
-        payload = json.loads(text)
+        payload = json.loads(json_text)
     except json.JSONDecodeError:
         return text, None, False
 
@@ -203,6 +204,21 @@ def parse_reply_envelope(
         available_agent_ids=available_agent_ids,
     )
     return reply_text.strip(), handoff, True
+
+
+def strip_json_code_fence(text: str) -> str:
+    if not text.startswith("```") or not text.endswith("```"):
+        return text
+
+    lines = text.splitlines()
+    if len(lines) < 3:
+        return text
+
+    opener = lines[0].strip().lower()
+    if opener not in {"```", "```json"}:
+        return text
+
+    return "\n".join(lines[1:-1]).strip()
 
 
 def parse_handoff(

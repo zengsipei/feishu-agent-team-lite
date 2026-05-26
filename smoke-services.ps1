@@ -56,6 +56,17 @@ function Get-DotEnvValue {
     return $null
 }
 
+function Redact-Text {
+    param([string]$Value)
+
+    if ($null -eq $Value) {
+        return $null
+    }
+    $Value `
+        -replace "\b(?:cli|oc|ou|om|omt)_[A-Za-z0-9_-]+\b", "<redacted>" `
+        -replace "(app_secret|access_token|tenant_access_token)=\S+", '$1=<redacted>'
+}
+
 function Read-AdapterStatuses {
     param([string]$Path)
 
@@ -181,6 +192,13 @@ if ($recentProblems.Count -gt 0) {
     $failures.Add("Recent local stderr logs contain $($recentProblems.Count) problem line(s)")
 }
 
+$safeFailures = @($failures | ForEach-Object { Redact-Text $_ })
+$safeRecentProblems = @($recentProblems | ForEach-Object {
+    [pscustomobject]@{
+        log = $_.log
+        line = Redact-Text $_.line
+    }
+})
 $result = [pscustomobject]@{
     ok = ($failures.Count -eq 0)
     base_url = $BaseUrl
@@ -188,10 +206,28 @@ $result = [pscustomobject]@{
     adapter_status_dir = if ($SkipAdapter) { $null } else { $AdapterStatusDir }
     expected_app_map_path = if ($ExpectedAppMapPath) { $ExpectedAppMapPath } else { $null }
     health = $health
-    agents = @($agents | Sort-Object agent_id | Select-Object agent_id, agent_name, app_id, source_memory_file, resolved_prompt_file)
-    adapter_workers = @($workers | Sort-Object agent_id | Select-Object agent_id, agent_name, app_id, status, pid, updated_at, message)
-    recent_problems = $recentProblems
-    failures = @($failures)
+    agents = @($agents | Sort-Object agent_id | ForEach-Object {
+        [pscustomobject]@{
+            agent_id = $_.agent_id
+            agent_name = $_.agent_name
+            app_id = if ($_.app_id) { "<redacted>" } else { $null }
+            source_memory_file = $_.source_memory_file
+            resolved_prompt_file = $_.resolved_prompt_file
+        }
+    })
+    adapter_workers = @($workers | Sort-Object agent_id | ForEach-Object {
+        [pscustomobject]@{
+            agent_id = $_.agent_id
+            agent_name = $_.agent_name
+            app_id = if ($_.app_id) { "<redacted>" } else { $null }
+            status = $_.status
+            pid = $_.pid
+            updated_at = $_.updated_at
+            message = Redact-Text $_.message
+        }
+    })
+    recent_problems = $safeRecentProblems
+    failures = $safeFailures
 }
 
 if ($Json) {
@@ -208,8 +244,8 @@ if ($Json) {
     "Recent problems"
     if ($SkipLocalLogs) {
         "Skipped local stderr log scan."
-    } elseif ($recentProblems.Count -gt 0) {
-        $recentProblems | Format-Table -AutoSize
+    } elseif ($safeRecentProblems.Count -gt 0) {
+        $safeRecentProblems | Format-Table -AutoSize
     } else {
         "No recent problem lines in local stderr logs."
     }
