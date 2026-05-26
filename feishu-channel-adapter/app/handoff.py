@@ -73,12 +73,6 @@ class GroupBotRosterResolver:
         target_app = self.registry.get_app(to_agent_id)
         if target_app is None:
             raise HandoffError(f"Unknown handoff target agent: {to_agent_id}")
-        if target_app.bot_open_id:
-            return ResolvedHandoffTarget(
-                agent=target_app,
-                bot_id=target_app.bot_open_id,
-                bot_name=target_app.mention_names[0] if target_app.mention_names else target_app.agent_name,
-            )
 
         names = {_normalize_name(name) for name in target_app.mention_names}
         names.discard("")

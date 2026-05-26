@@ -9,7 +9,6 @@ class AgentApp:
     agent_name: str
     app_id: str
     app_secret: str
-    bot_open_id: str = ""
     mention_names: tuple[str, ...] = ()
 
 
@@ -30,7 +29,6 @@ class AgentAppRegistry:
                 agent_name=item["agent_name"],
                 app_id=item["app_id"],
                 app_secret=item.get("app_secret", ""),
-                bot_open_id=str(item.get("bot_open_id") or item.get("bot_id") or "").strip(),
                 mention_names=_mention_names(item),
             )
             if not app.app_secret:
