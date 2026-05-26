@@ -6,8 +6,8 @@
 - Scope: read-only evidence collection, post-deploy strict verification, and real Feishu E2E
 - Target server: strict running-service pre-check executed; no blocking failures found
 - Local verification mode: Docker runtime/adapter already running
-- Next stage: Off-host backup/rollback ownership confirmation and formal release review
-- Formal release: blocked until off-host backup/rollback ownership is confirmed and the user explicitly approves release readiness
+- Next stage: First real project trial
+- Release state: ready for project trial after Manual 1Panel Deploy Gate approval
 
 ## Release Gate State
 
@@ -22,7 +22,11 @@
 | Target 1Panel server read-only pre-check | Conditional pass | `pass=13`, `warn=1`, `fail=0`, `not_verified=4`; `ok=true`; no blocking failures reported by the read-only pre-check. |
 | Target 1Panel running-service strict pre-check | Pass | `pass=16`, `warn=0`, `fail=0`, `not_verified=2`; `ok=true`; Compose containers, runtime health, port `8080`, adapter workers, and logs passed. |
 | Post-deploy real Feishu 8 Agent E2E | Pass | Batch `E8-234504`; 8 sent, 8 replies, 8 app sender matches, 8 real mentions, 0 failures. |
-| Formal release | Blocked | Requires off-host backup/rollback ownership confirmation and explicit user approval. |
+| Off-host backup target | Confirmed | External backup volume mounted at `/opt/1panel/apps/feishu-agent-team-lite`; confirmed by `zengsipei`. |
+| Rollback owner | Confirmed | `zengsipei`. |
+| Deploy operator | Confirmed | `zengsipei`. |
+| Manual 1Panel Deploy Gate | Approved and completed | Deployment window `2026-05-26T22:31:42+08:00`; approval captured for `feishu-agent-team`. |
+| Release state | Ready for project trial | Strict pre-check, backup/rollback ownership, deployment approval, and real Feishu E2E are complete. |
 
 ## Commands Run Locally
 
@@ -195,7 +199,7 @@ The target running-service gate is ready for real Feishu E2E because:
 - Adapter status has 8 files and 8 connected workers.
 - Logs reported 0 problem lines.
 
-The final release remains blocked until off-host backup/rollback ownership is confirmed and the user explicitly approves release readiness.
+The Manual 1Panel Deploy Gate is approved and complete for project trial. Further production-readiness announcements or server operations still require separate explicit approval.
 
 ## Post-Deploy Real Feishu 8 Agent E2E Evidence
 
@@ -258,15 +262,32 @@ Source summary:
 | Logs | Problem-pattern counts only; no raw logs pasted. |
 | Backup/rollback | Off-host backup target and rollback owner confirmed before deployment approval. |
 
+## Manual 1Panel Deploy Gate Confirmation
+
+Captured confirmation:
+
+| Field | State |
+| --- | --- |
+| Off-host backup target | Confirmed; external backup volume mounted at `/opt/1panel/apps/feishu-agent-team-lite`. |
+| Rollback owner | `zengsipei` |
+| Deploy operator | `zengsipei` |
+| Deployment window | `2026-05-26T22:31:42+08:00` |
+| Approval | `I approve opening the Manual 1Panel Deploy Gate for feishu-agent-team.` |
+
+Gate interpretation:
+
+- The approval opens the Manual 1Panel Deploy Gate for human-operated deployment and records that the target running-service state is now verified.
+- It does not authorize Agents to SSH into the server, run Docker commands, mutate 1Panel configuration, or operate rollback directly.
+- With strict pre-check and real Feishu 8 Agent E2E already passed, the system is ready for the first real project trial.
+
 ## Risks And Blockers
 
-- Formal release is still blocked until off-host backup/rollback ownership is confirmed and the user explicitly approves release readiness.
+- Manual 1Panel Deploy Gate approval, off-host backup target, rollback owner, and deploy operator are now confirmed.
 - The target 1Panel server strict running-service pre-check now reports no blocking failures.
 - Adapter worker status passed with 8 connected workers.
 - Runtime health passed in the target environment.
 - Compose runtime state passed with 2 containers.
 - Post-deploy real Feishu 8 Agent E2E passed with batch `E8-234504`.
-- Off-host backup target and rollback owner remain operator-confirmed items.
 - The next stage is not remote CI/CD access. Release Agent may coordinate Feishu approvals or GitHub workflows for other systems, but must not operate this 1Panel server.
 - Agents still cannot emit real Feishu rich-text mentions for automatic multi-Agent relay; unattended cross-Agent handoff requires later orchestration work.
 
@@ -275,9 +296,9 @@ Source summary:
 - Do not run `docker compose up`, `down`, `restart`, `pull`, or `build`.
 - Do not start, stop, restart, recreate, or redeploy in 1Panel.
 - Do not write `.env`, runtime config, runtime data, adapter status, or server settings.
-- Do not publish or announce release readiness.
+- Do not announce broader production readiness beyond the approved project-trial gate without separate approval.
 - Do not paste raw secrets, tokens, app secrets, real Feishu IDs, SQLite files, status files, or raw logs into git or chat reports.
 
 ## Recommendation
 
-The target running-service evidence and post-deploy real Feishu 8 Agent E2E have passed. Do not announce release readiness until off-host backup/rollback ownership is confirmed and the user explicitly approves release readiness. Until then, restart, recreate, build, pull, configuration writes, and release announcement remain forbidden unless explicitly approved as rollback or remediation.
+The target running-service evidence, Manual 1Panel Deploy Gate confirmation, and post-deploy real Feishu 8 Agent E2E have passed. The system is ready for the first real project trial. Further restart, recreate, build, pull, configuration writes, rollback, or broader production-readiness announcements remain forbidden unless explicitly approved as rollback, remediation, or a separate release action.

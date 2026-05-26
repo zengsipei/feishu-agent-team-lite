@@ -9,10 +9,12 @@ Use this runbook after the target server read-only pre-check has no blocking fai
 | Target read-only pre-check | Conditional pass | Pre-deploy sanitized evidence reported `pass=13`, `warn=1`, `fail=0`, `not_verified=4`, `ok=true`. |
 | Target running-service strict pre-check | Pass | Post-deploy sanitized evidence reported `pass=16`, `warn=0`, `fail=0`, `not_verified=2`, `ok=true`. |
 | Blocking failures | None reported | Target private files and Compose config were present and valid in the supplied evidence. |
-| Off-host backup target | Not verified | Must be confirmed by the operator before deployment. |
-| Rollback owner | Not verified | Must be named before deployment. |
-| Manual 1Panel Deploy Gate | Human action completed | Target running-service evidence shows Compose containers, runtime health, and adapter workers are running. |
-| Final release | Blocked | Requires post-deploy service checks and real Feishu 8 Agent E2E. |
+| Off-host backup target | Confirmed | External backup volume mounted at `/opt/1panel/apps/feishu-agent-team-lite`; confirmed by `zengsipei`. |
+| Rollback owner | Confirmed | `zengsipei`. |
+| Deploy operator | Confirmed | `zengsipei`. |
+| Manual 1Panel Deploy Gate | Approved and completed | Approval captured for `feishu-agent-team`; target running-service evidence shows Compose containers, runtime health, and adapter workers are running. |
+| Post-deploy real Feishu E2E | Pass | Batch `E8-234504`; 8 sent, 8 replies, 8 app sender matches, 8 real mentions, 0 failures. |
+| Release state | Ready for project trial | Strict pre-check, backup/rollback ownership, deployment approval, and real Feishu E2E are complete. |
 
 ## Required Human Confirmation
 
@@ -23,6 +25,16 @@ Off-host backup target: <confirmed target label, not secret path details>
 Rollback owner: <human owner>
 Deploy operator: <human operator>
 Deployment window: <date/time and timezone>
+Approval: I approve opening the Manual 1Panel Deploy Gate for feishu-agent-team.
+```
+
+Captured confirmation:
+
+```text
+Off-host backup target: confirmed; external backup volume mounted at /opt/1panel/apps/feishu-agent-team-lite
+Rollback owner: zengsipei
+Deploy operator: zengsipei
+Deployment window: 2026-05-26T22:31:42+08:00
 Approval: I approve opening the Manual 1Panel Deploy Gate for feishu-agent-team.
 ```
 
@@ -46,7 +58,7 @@ Release Agent and runtime Agents must not:
 - run `docker compose up`, `down`, `restart`, `pull`, `build`, or direct container commands
 - start, stop, restart, recreate, or redeploy the 1Panel app
 - paste raw secrets, app secrets, tokens, status files, SQLite files, raw logs, or real Feishu IDs into chat or git
-- announce release readiness before post-deploy checks and real Feishu E2E pass
+- announce broader production readiness beyond this project-trial gate without separate approval
 
 ## Human 1Panel Action
 
@@ -115,6 +127,8 @@ After strict server checks pass:
 4. Record only sanitized results: agent id, pass/fail, timestamp, and failure summary if any.
 
 The server migration is not complete until all 8 real `@` replies pass in the target environment.
+
+Current result: server migration gate is complete for project trial. Batch `E8-234504` passed 8/8 real `@Agent` replies with expected app routes.
 
 ## Failure Handling
 
