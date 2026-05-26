@@ -26,6 +26,7 @@ Tracked files to upload or pull on the server:
 ```text
 docker-compose.full.yml
 README.md
+monitor-services.ps1
 smoke-services.ps1
 docs/
 feishu-agent-runtime/
@@ -92,6 +93,7 @@ Recommended layout:
     app/
     .env
     status/
+  monitor-services.ps1
   smoke-services.ps1
 ```
 
@@ -193,6 +195,16 @@ pwsh ./smoke-services.ps1 `
   -AdapterStatusDir ./feishu-channel-adapter/status
 ```
 
+Run the monitor check:
+
+```powershell
+pwsh ./monitor-services.ps1 `
+  -Docker `
+  -BaseUrl http://127.0.0.1:8080 `
+  -RuntimeEnvPath ./feishu-agent-runtime/.env `
+  -AdapterStatusDir ./feishu-channel-adapter/status
+```
+
 ## Final E2E Gate
 
 After 1Panel deploy, run the same real group test in [E2E runbook](./e2e-runbook.md):
@@ -203,6 +215,8 @@ After 1Panel deploy, run the same real group test in [E2E runbook](./e2e-runbook
 - Confirm each reply `sender.id` equals the expected `app_id`.
 
 Do not consider the server migration complete until all 8 real `@` replies pass.
+
+After the final E2E gate passes, start the first project trial with [Real Project Trial Runbook](./project-trial-runbook.md).
 
 ## Backup
 
