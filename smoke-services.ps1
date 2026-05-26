@@ -77,7 +77,10 @@ function Read-AdapterStatuses {
     @(Get-ChildItem -LiteralPath $Path -Filter "*.json" -File -ErrorAction SilentlyContinue | ForEach-Object {
         $file = $_
         try {
-            Get-Content -Raw -LiteralPath $file.FullName | ConvertFrom-Json
+            $status = Get-Content -Raw -LiteralPath $file.FullName | ConvertFrom-Json
+            if ($null -ne $status.agent_id -and $null -ne $status.status) {
+                $status
+            }
         } catch {
             [pscustomobject]@{
                 agent_id = $file.BaseName
