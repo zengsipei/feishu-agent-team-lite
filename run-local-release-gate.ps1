@@ -5,16 +5,22 @@ param(
     [int]$ExpectedAgentCount = 8,
     [int]$ChainTimeoutSeconds = 210,
     [int]$PollSeconds = 15,
+    [string]$CheckMarker = "",
     [switch]$SkipChain,
     [switch]$Json
 )
 
 $ErrorActionPreference = "Stop"
+$CheckMarkerWasProvided = $PSBoundParameters.ContainsKey("CheckMarker")
 
 $ServicesRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 if (-not $ComposeFile) {
     $ComposeFile = Join-Path $ServicesRoot "docker-compose.full.yml"
 }
+if ($null -eq $CheckMarker) {
+    $CheckMarker = ""
+}
+$CheckMarker = $CheckMarker.Trim()
 
 $RuntimeDir = Join-Path $ServicesRoot "feishu-agent-runtime"
 $AdapterDir = Join-Path $ServicesRoot "feishu-channel-adapter"
@@ -168,7 +174,6 @@ function Invoke-ChainGate {
         "Bypass",
         "-File",
         $ChainScript,
-        "-Send",
         "-Json",
         "-ChatQuery",
         $ChatQuery,
@@ -177,6 +182,11 @@ function Invoke-ChainGate {
         "-PollSeconds",
         "$PollSeconds"
     )
+    if ($CheckMarker) {
+        $arguments += @("-CheckOnly", "-Marker", $CheckMarker)
+    } else {
+        $arguments += @("-Send")
+    }
 
     $raw = & $powerShellExe @arguments 2>&1
     $exitCode = $LASTEXITCODE
@@ -191,6 +201,7 @@ function Invoke-ChainGate {
     [pscustomobject]@{
         ok = ($exitCode -eq 0 -and [bool]$parsed.ok)
         exit_code = $exitCode
+        mode = if ($CheckMarker) { "check" } else { "send" }
         marker = $parsed.marker
         hit_count = $parsed.hit_count
         release_done = $parsed.summary.release_done
@@ -200,6 +211,12 @@ function Invoke-ChainGate {
 
 $failures = New-Object System.Collections.Generic.List[string]
 $steps = New-Object System.Collections.Generic.List[object]
+
+if ($CheckMarkerWasProvided -and -not $CheckMarker) {
+    $failures.Add("-CheckMarker requires a non-empty marker.")
+} elseif ($SkipChain -and $CheckMarker) {
+    $failures.Add("-SkipChain and -CheckMarker cannot be used together.")
+}
 
 foreach ($path in @($RuntimePython, $AdapterPython, $ChainScript, $SmokeScript, $ComposeFile)) {
     if (-not (Test-Path -LiteralPath $path)) {
@@ -321,6 +338,7 @@ if ($Json) {
         "Chain"
         [pscustomobject]@{
             marker = $chain.detail.marker
+            mode = $chain.detail.mode
             hit_count = $chain.detail.hit_count
             release_done = $chain.detail.release_done
             missing = $chain.detail.missing_confirmations -join ", "
