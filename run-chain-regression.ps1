@@ -154,21 +154,32 @@ function Get-MarkerHits {
     } | Sort-Object time)
 }
 
+function Test-HandoffTargetsAgent {
+    param(
+        [string]$Content,
+        $Agent
+    )
+
+    if (-not $Content -or $Content -notlike "Agent Handoff*") {
+        return $false
+    }
+
+    foreach ($name in @(Get-AgentNames -Agent $Agent)) {
+        $escaped = [regex]::Escape($name)
+        if ($Content -match "(?im)^@\s*$escaped(?:\s|$|[，,。:：#])") {
+            return $true
+        }
+    }
+    return $false
+}
+
 function Get-ChainSummary {
     param([object[]]$Hits)
 
-    $confirmations = [ordered]@{}
-    foreach ($agentId in $Chain) {
-        $confirmation = @(
-            $Hits | Where-Object {
-                $_.content -notlike "Agent Handoff*" -and $_.content -like "*current_agent_id=$agentId*"
-            }
-        )
-        $confirmations[$agentId] = ($confirmation.Count -gt 0)
-    }
+    $handoffHits = @($Hits | Where-Object { $_.content -like "Agent Handoff*" })
 
     $handoffTargets = @()
-    foreach ($hit in $Hits) {
+    foreach ($hit in $handoffHits) {
         if ($hit.content -match "^Agent Handoff\s+@([^\r\n]+)") {
             $handoffTargets += $Matches[1].Trim()
         }
@@ -178,15 +189,46 @@ function Get-ChainSummary {
         $Hits | Where-Object {
             $_.content -notlike "Agent Handoff*" -and (
                 $_.content -like "*current_agent_id=release*" -or
+                $_.content -like "*当前为 release*" -or
                 $_.content -like "*链路结束*" -or
+                ($_.content -like "*Release Agent*" -and $_.content -like "*确认完成*") -or
+                ($_.content -like "*Release Agent*" -and $_.content -like "*末节点*") -or
                 $_.content -like "*状态：Done*" -or
                 $_.content -like "*状态: Done*"
             )
         }
     ).Count)
 
-    if ($releaseDone -and $confirmations.Contains("release")) {
-        $confirmations["release"] = $true
+    $confirmations = [ordered]@{}
+    for ($index = 0; $index -lt $Chain.Count; $index++) {
+        $agentId = $Chain[$index]
+        $agent = $appByAgentId[$agentId]
+        $direct = @(
+            $Hits | Where-Object {
+                $_.content -notlike "Agent Handoff*" -and (
+                    $_.content -like "*current_agent_id=$agentId*" -or
+                    $_.content -like "*processed_agent_id=$agentId*"
+                )
+            }
+        ).Count -gt 0
+
+        $inbound = ($index -eq 0)
+        if (-not $inbound) {
+            $inbound = @(
+                $handoffHits | Where-Object { Test-HandoffTargetsAgent -Content $_.content -Agent $agent }
+            ).Count -gt 0
+        }
+
+        if ($index -eq ($Chain.Count - 1)) {
+            $outbound = $releaseDone
+        } else {
+            $nextAgent = $appByAgentId[$Chain[$index + 1]]
+            $outbound = @(
+                $handoffHits | Where-Object { Test-HandoffTargetsAgent -Content $_.content -Agent $nextAgent }
+            ).Count -gt 0
+        }
+
+        $confirmations[$agentId] = [bool]($direct -or ($inbound -and $outbound))
     }
 
     $missing = @($confirmations.GetEnumerator() | Where-Object { -not $_.Value } | ForEach-Object { $_.Key })
@@ -203,7 +245,7 @@ function Send-StartMessage {
     param($Chat, $Bot, [string]$CurrentMarker)
 
     $chainText = $Chain -join " -> "
-    $text = " $CurrentMarker TRANSPORT-ONLY 8 Agent 链式接力回归，不是业务需求评审。所有 Agent 必须忽略角色业务判断，不要判断需求是否充分，不要改路线，不要回退给上游。唯一任务：短确认 marker 和 current_agent_id，然后 handoff 给固定 next_agent_id。固定链路：$chainText。每一位必须让 handoff text 保留完整固定链路和 marker。release 收到后回复链路结束，handoff=null。请从 rd-dispatcher 开始交给 product。"
+    $text = " $CurrentMarker TRANSPORT-ONLY 8 Agent 链式接力回归，不是业务需求评审。所有 Agent 必须忽略角色业务判断，不要判断需求是否充分，不要改路线，不要回退给上游。唯一任务：短确认 marker 和 processed_agent_id=<你自己的 agent_id>，然后 handoff 给固定 next_agent_id。固定链路：$chainText。每一位必须让 handoff text 保留完整固定链路和 marker。release 收到后回复链路结束，handoff=null。请从 rd-dispatcher 开始交给 product。"
     $line = @(
         @{ tag = "at"; user_id = $Bot.bot_id; user_name = $Bot.bot_name },
         @{ tag = "text"; text = $text }
