@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     comment_fetch_enabled: bool = False
     comment_reply_enabled: bool = False
 
+    handoff_loop_guard_enabled: bool = True
+    handoff_loop_guard_ttl_seconds: int = 600
+    handoff_loop_guard_max_count: int = 1
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     @staticmethod

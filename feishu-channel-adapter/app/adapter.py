@@ -14,6 +14,7 @@ from lark_oapi.core.enum import LogLevel
 from .comment_drive import DriveCommentClient
 from .config import Settings
 from .handoff import BotRosterClient, HandoffError, HandoffSender
+from .handoff_guard import HandoffLoopGuard
 from .registry import AgentApp, AgentAppRegistry
 from .runtime_client import RuntimeClient
 from .serialization import attr, nested_attr, to_jsonable
@@ -31,6 +32,12 @@ class ChannelAdapter:
             timeout_seconds=settings.runtime_timeout_seconds,
         )
         self.registry = AgentAppRegistry(settings.agent_runtime_config_path)
+        self.handoff_guard = HandoffLoopGuard(
+            status_dir=settings.adapter_status_dir,
+            enabled=settings.handoff_loop_guard_enabled,
+            ttl_seconds=settings.handoff_loop_guard_ttl_seconds,
+            max_count=settings.handoff_loop_guard_max_count,
+        )
         self.channels: list[FeishuChannel] = []
         self.comment_clients: dict[str, DriveCommentClient] = {}
         self._stop_event = asyncio.Event()
@@ -174,6 +181,33 @@ class ChannelAdapter:
         if not to_agent_id or not text:
             return
 
+        from_agent_id = reply.get("agent_id") or app.agent_id
+        guard = getattr(self, "handoff_guard", None)
+        if guard is not None:
+            try:
+                decision = guard.check(
+                    chat_id=chat_id,
+                    from_agent_id=from_agent_id,
+                    to_agent_id=to_agent_id,
+                    text=text,
+                )
+            except Exception:
+                logger.exception(
+                    "Agent handoff guard failed from_agent_id=%s to_agent_id=%s",
+                    from_agent_id,
+                    to_agent_id,
+                )
+            else:
+                if not decision.allowed:
+                    logger.warning(
+                        "Agent handoff suppressed by loop guard from_agent_id=%s to_agent_id=%s task_key=%s count=%s",
+                        from_agent_id,
+                        to_agent_id,
+                        decision.task_key,
+                        decision.count,
+                    )
+                    return
+
         sender = HandoffSender(
             registry=self.registry,
             roster_client=BotRosterClient(channel.client),
@@ -182,7 +216,7 @@ class ChannelAdapter:
             result, target = await sender.send(
                 channel=channel,
                 chat_id=chat_id,
-                from_agent_id=reply.get("agent_id") or app.agent_id,
+                from_agent_id=from_agent_id,
                 to_agent_id=to_agent_id,
                 text=text,
                 title="Agent Handoff",
@@ -190,7 +224,7 @@ class ChannelAdapter:
         except HandoffError as exc:
             logger.warning(
                 "Agent handoff failed from_agent_id=%s to_agent_id=%s error=%s",
-                reply.get("agent_id") or app.agent_id,
+                from_agent_id,
                 to_agent_id,
                 exc,
             )
@@ -199,7 +233,7 @@ class ChannelAdapter:
         if not getattr(result, "success", False):
             logger.warning(
                 "Agent handoff send failed from_agent_id=%s to_agent_id=%s result=%s",
-                reply.get("agent_id") or app.agent_id,
+                from_agent_id,
                 to_agent_id,
                 to_jsonable(result),
             )
@@ -207,10 +241,24 @@ class ChannelAdapter:
 
         logger.info(
             "Agent handoff sent from_agent_id=%s to_agent_id=%s target_agent_id=%s",
-            reply.get("agent_id") or app.agent_id,
+            from_agent_id,
             to_agent_id,
             target.agent.agent_id,
         )
+        if guard is not None:
+            try:
+                guard.record(
+                    chat_id=chat_id,
+                    from_agent_id=from_agent_id,
+                    to_agent_id=to_agent_id,
+                    text=text,
+                )
+            except Exception:
+                logger.exception(
+                    "Agent handoff guard record failed from_agent_id=%s to_agent_id=%s",
+                    from_agent_id,
+                    to_agent_id,
+                )
 
     async def _handle_comment(self, app: AgentApp, comment: Any) -> None:
         payload = await self._normalize_comment(app, comment)

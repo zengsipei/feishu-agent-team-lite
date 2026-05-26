@@ -30,6 +30,20 @@ class LLMOutputContractPromptTests(unittest.TestCase):
         self.assertIn("Do not include Feishu <at> tags", prompt)
         self.assertIn("open_id, app_id, or bot_id", prompt)
 
+    def test_blocks_missing_execution_access_without_handoff(self) -> None:
+        prompt = build_completion_user_message(
+            user_text="请修改仓库文件",
+            metadata={"available_agent_ids": ["rd-dispatcher", "coding"]},
+        )
+
+        self.assertIn("Feishu is the business system of record", prompt)
+        self.assertIn("Prefer Feishu-native orchestration", prompt)
+        self.assertIn("repository, filesystem, PowerShell, shell, Docker, GitHub, or server access", prompt)
+        self.assertIn("状态：Blocked", prompt)
+        self.assertIn("set handoff to null", prompt)
+        self.assertIn("Do not hand off back to the sender", prompt)
+        self.assertIn("Do not rely on the next Agent seeing prior @ messages", prompt)
+
 
 if __name__ == "__main__":
     unittest.main()

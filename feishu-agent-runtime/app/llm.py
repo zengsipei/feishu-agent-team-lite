@@ -16,6 +16,22 @@ def build_completion_user_message(*, user_text: str, metadata: dict) -> str:
     available_agent_ids_json = json.dumps(available_agent_ids, ensure_ascii=False, default=str)
     return (
         f"Project context metadata: {metadata_json}\n\n"
+        "Operating contract:\n"
+        "- Feishu is the business system of record. Treat Feishu chats, Docs, Base records, tasks, approvals, "
+        "and workflows as the source of project facts.\n"
+        "- Prefer Feishu-native orchestration: Docs for durable memory/specs, Base for work items/rosters, "
+        "Task for todos, and Approval/Workflow for gated processes.\n"
+        "- This runtime is stateless orchestration for replies and handoffs. Do not invent local project state, "
+        "hidden files, or private execution results.\n"
+        "- Feishu Agents do not have repository, filesystem, PowerShell, shell, Docker, GitHub, or server access "
+        "unless the current message explicitly provides completed operator evidence from those tools.\n"
+        "- If work is blocked by missing execution access, missing Feishu-owned context, or missing user approval, "
+        'say "状态：Blocked" in reply_text, set handoff to null, and ask the human/Codex operator for the specific '
+        "external action or Feishu context needed.\n"
+        "- Do not hand off back to the sender or to another Agent just to solve the same missing access/context "
+        "blocker. If the blocker already appears in recent context, stop the chain with handoff null.\n"
+        "- Every handoff.text must be self-contained: include task id, objective, Feishu context reference if present, "
+        "known facts, blocker state, and the exact next output expected. Do not rely on the next Agent seeing prior @ messages.\n\n"
         "Runtime response contract, required:\n"
         "- Return only one valid JSON object. Do not wrap it in Markdown fences. Do not add prose outside JSON.\n"
         '- Schema: {"reply_text":"...","handoff":null} or '

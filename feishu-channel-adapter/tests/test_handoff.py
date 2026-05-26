@@ -1,9 +1,12 @@
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest.mock import patch
 
 from app.adapter import ChannelAdapter
 from app.handoff import BotRosterMember, GroupBotRosterResolver, HandoffError
+from app.handoff_guard import HandoffLoopGuard, extract_task_key
 from app.registry import AgentApp
 
 
@@ -36,6 +39,16 @@ class FakeChannel:
 class FailingHandoffSender:
     async def send(self, **_kwargs):
         raise HandoffError("missing scope")
+
+
+class RecordingHandoffSender:
+    def __init__(self):
+        self.calls = []
+
+    async def send(self, **kwargs):
+        self.calls.append(kwargs)
+        target = SimpleNamespace(agent=SimpleNamespace(agent_id=kwargs["to_agent_id"]))
+        return SimpleNamespace(success=True), target
 
 
 class RosterResolverTests(unittest.IsolatedAsyncioTestCase):
@@ -130,6 +143,60 @@ class AdapterHandoffTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(channel.sent[0][1], {"markdown": "收到"})
         self.assertEqual(channel.sent[0][2], {"reply_to": "message"})
         self.assertIn("Agent handoff failed", "\n".join(logs.output))
+
+    async def test_loop_guard_suppresses_repeated_same_task_handoff(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            adapter = object.__new__(ChannelAdapter)
+            adapter.registry = object()
+            adapter.handoff_guard = HandoffLoopGuard(status_dir=Path(temp_dir), ttl_seconds=600, max_count=1)
+            channel = FakeChannel()
+            app = AgentApp(
+                agent_id="rd-dispatcher",
+                agent_name="R&D Dispatcher",
+                app_id="app-fake",
+                app_secret="secret",
+            )
+            message = SimpleNamespace(chat_id="chat", message_id="message")
+            reply = {
+                "status": "ok",
+                "agent_id": "rd-dispatcher",
+                "reply_text": "收到",
+                "handoff": {
+                    "to_agent_id": "coding",
+                    "text": "任务：修复循环\n任务ID：WI-LOOP-1\n需要你做：实现",
+                },
+            }
+            sender = RecordingHandoffSender()
+
+            with patch("app.adapter.HandoffSender", return_value=sender):
+                await adapter._send_message_reply(channel, app, message, reply)
+                await adapter._send_message_reply(channel, app, message, reply)
+
+            self.assertEqual(len(channel.sent), 2)
+            self.assertEqual(len(sender.calls), 1)
+            self.assertEqual(sender.calls[0]["to_agent_id"], "coding")
+
+
+class HandoffLoopGuardTests(unittest.TestCase):
+    def test_extracts_task_id_from_handoff_text(self) -> None:
+        self.assertEqual(
+            extract_task_key("任务：修复循环\n任务ID：WI-REAL-FEATURE-CHECKMARKER-20260527-034603"),
+            "WI-REAL-FEATURE-CHECKMARKER-20260527-034603",
+        )
+
+    def test_blocks_repeated_same_direction_within_ttl(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            guard = HandoffLoopGuard(status_dir=Path(temp_dir), ttl_seconds=600, max_count=1)
+            kwargs = {
+                "chat_id": "chat",
+                "from_agent_id": "rd-dispatcher",
+                "to_agent_id": "coding",
+                "text": "任务ID：WI-LOOP-1\n请实现",
+            }
+
+            self.assertTrue(guard.check(**kwargs).allowed)
+            self.assertTrue(guard.record(**kwargs).allowed)
+            self.assertFalse(guard.check(**kwargs).allowed)
 
 
 if __name__ == "__main__":
