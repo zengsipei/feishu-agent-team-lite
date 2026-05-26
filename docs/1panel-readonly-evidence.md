@@ -3,11 +3,11 @@
 - Task ID: agent-team-1panel-readonly-precheck-20260526
 - Operator: Codex local workspace
 - Date/time: 2026-05-26 Asia/Shanghai
-- Scope: read-only evidence collection only
-- Target server: read-only pre-check executed; no blocking failures found
+- Scope: read-only evidence collection and post-deploy strict verification
+- Target server: strict running-service pre-check executed; no blocking failures found
 - Local verification mode: Docker runtime/adapter already running
-- Next stage: Manual 1Panel Deploy Gate
-- Formal deployment: blocked
+- Next stage: Post-deploy real Feishu 8 Agent E2E
+- Formal release: blocked until off-host backup/rollback ownership is confirmed and real Feishu E2E passes
 
 ## Release Gate State
 
@@ -20,8 +20,9 @@
 | Local PowerShell read-only pre-check script | Pass | `pass=16`, `warn=0`, `fail=0`, `not_verified=2`. |
 | Local running-service strict pre-check | Pass | Bash and PowerShell both passed with `--require-compose-services`, runtime health required, adapter connected required, and local mapped port `18080` required listening. |
 | Target 1Panel server read-only pre-check | Conditional pass | `pass=13`, `warn=1`, `fail=0`, `not_verified=4`; `ok=true`; no blocking failures reported by the read-only pre-check. |
-| Manual 1Panel Deploy Gate | Blocked | Allows only a human-operated 1Panel deployment window after evidence review, off-host backup/rollback confirmation, and explicit user approval. It does not authorize Agent-run server operations or remote CI/CD deployment. |
-| Formal deployment/release | Blocked | Requires the Manual 1Panel Deploy Gate to open before any deployment action. |
+| Target 1Panel running-service strict pre-check | Pass | `pass=16`, `warn=0`, `fail=0`, `not_verified=2`; `ok=true`; Compose containers, runtime health, port `8080`, adapter workers, and logs passed. |
+| Post-deploy real Feishu 8 Agent E2E | Pending | Must verify visible `@Agent` replies in a project group against expected app routes. |
+| Formal release | Blocked | Requires off-host backup/rollback ownership confirmation and post-deploy real Feishu E2E pass. |
 
 ## Commands Run Locally
 
@@ -132,6 +133,70 @@ bash ./1panel-readonly-precheck.sh \
       --runtime-mode pre-deploy
 ```
 
+## Target Server Strict Post-Deploy Evidence
+
+Source summary:
+
+- Source: target-strict-precheck
+- Server label: target-1panel
+- Deployment directory label: feishu-agent-team
+- Runtime mode: already-running
+- Generated at: 2026-05-26T22:31:42+08:00
+- Overall ok: true
+- Expected agent count: 8
+- Port mode: RequireListening
+- Raw env values, app IDs, app secrets, status file bodies, response bodies, and logs: suppressed
+
+| pass | warn | fail | not_verified |
+| --- | --- | --- | --- |
+| 16 | 0 | 0 | 2 |
+
+### Strict Key Evidence
+
+| Area | Result | Sanitized Evidence |
+| --- | --- | --- |
+| Host resources | Pass | Memory total `23975 MB`, available `13633 MB`; disk free `78.54 GB`, used `113.17 GB`. |
+| Directory layout | Pass | 6 paths checked, 6 exist, 6 ACL-readable; write test not performed. |
+| Runtime env | Pass | 4 required keys present, 0 missing, 0 blank; values suppressed. |
+| Adapter env | Pass | 4 required keys present, 0 missing, 0 blank; values suppressed. |
+| Runtime config | Pass | 8 apps, 8 `agent_id`, 8 `app_id`, duplicate groups `0`; secrets suppressed. |
+| Docker/Compose | Pass | Compose file and CLI are present; `docker compose config` passed; `compose ps` passed with 2 containers. |
+| Port state | Pass | Port `8080` observed as listening via `ss`; policy was `RequireListening`. |
+| Runtime health | Pass | Runtime health endpoint returned `ok=true`; response body suppressed. |
+| Network | Pass | Feishu Open Platform reached and returned an HTTP response. |
+| Adapter status | Pass | 8 status files, expected 8; 8 connected; 0 bad JSON; app IDs suppressed. |
+| Logs | Pass | 2 services checked, problem line count `0`; raw logs suppressed. |
+| Backup inventory | Pass | 7 backup candidates checked, 5 exist; contents suppressed. |
+| Off-host backup target | Not verified | Operator confirmation still required. |
+| Formal deploy approval | Not verified | Formal release remains blocked until sanitized evidence is reviewed, backup/rollback ownership is confirmed, and post-deploy real Feishu E2E passes. |
+
+### Strict Blocking Failures
+
+- None reported by the strict pre-check.
+
+### Strict Warnings
+
+- None reported by the strict pre-check.
+
+### Strict Not Verified
+
+| Area | Name | Summary |
+| --- | --- | --- |
+| rollback | external backup target | Operator must confirm the off-host backup target and rollback owner before release approval. |
+| release_gate | formal deploy | Formal release remains blocked until sanitized evidence is reviewed and explicitly approved. |
+
+### Post-Deploy E2E Entry Criteria
+
+The target running-service gate is ready for real Feishu E2E because:
+
+- Compose has 2 running containers.
+- Runtime health passed.
+- Port `8080` is listening under `RequireListening`.
+- Adapter status has 8 files and 8 connected workers.
+- Logs reported 0 problem lines.
+
+The final release remains blocked until all 8 real `@Agent` replies pass in a project group.
+
 ## Required Server Evidence Fields
 
 | Field | Required State |
@@ -147,11 +212,11 @@ bash ./1panel-readonly-precheck.sh \
 
 ## Risks And Blockers
 
-- Formal deployment and release are still blocked until the Manual 1Panel Deploy Gate opens.
-- The target 1Panel server read-only pre-check now reports no blocking failures.
-- Adapter worker status is still a warning because services are not running and no status files exist in pre-deploy mode.
-- Runtime health is not verified because the runtime service is not running in pre-deploy mode.
-- Compose containers are not associated with the file yet; this is expected before formal deployment but remains unverified runtime state.
+- Formal release is still blocked until off-host backup/rollback ownership is confirmed and post-deploy real Feishu E2E passes.
+- The target 1Panel server strict running-service pre-check now reports no blocking failures.
+- Adapter worker status passed with 8 connected workers.
+- Runtime health passed in the target environment.
+- Compose runtime state passed with 2 containers.
 - Off-host backup target and rollback owner remain operator-confirmed items.
 - The next stage is not remote CI/CD access. Release Agent may coordinate Feishu approvals or GitHub workflows for other systems, but must not operate this 1Panel server.
 - Agents still cannot emit real Feishu rich-text mentions for automatic multi-Agent relay; unattended cross-Agent handoff requires later orchestration work.
@@ -166,4 +231,4 @@ bash ./1panel-readonly-precheck.sh \
 
 ## Recommendation
 
-The read-only evidence can move to review. The recommended next stage is [Manual 1Panel Deploy Gate](./1panel-manual-deploy-gate.md). Do not proceed to formal deployment until off-host backup/rollback ownership is confirmed and the user explicitly opens that gate. Until then, deployment, restart, recreate, build, pull, and production configuration write operations remain forbidden.
+The target running-service evidence can move to post-deploy real Feishu 8 Agent E2E. Do not announce release readiness until off-host backup/rollback ownership is confirmed and all 8 visible `@Agent` replies pass in the target environment. Until then, restart, recreate, build, pull, configuration writes, and release announcement remain forbidden unless explicitly approved as rollback or remediation.

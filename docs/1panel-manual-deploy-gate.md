@@ -6,11 +6,12 @@ Use this runbook after the target server read-only pre-check has no blocking fai
 
 | Item | State | Notes |
 | --- | --- | --- |
-| Target read-only pre-check | Conditional pass | Latest sanitized evidence reported `pass=13`, `warn=1`, `fail=0`, `not_verified=4`, `ok=true`. |
+| Target read-only pre-check | Conditional pass | Pre-deploy sanitized evidence reported `pass=13`, `warn=1`, `fail=0`, `not_verified=4`, `ok=true`. |
+| Target running-service strict pre-check | Pass | Post-deploy sanitized evidence reported `pass=16`, `warn=0`, `fail=0`, `not_verified=2`, `ok=true`. |
 | Blocking failures | None reported | Target private files and Compose config were present and valid in the supplied evidence. |
 | Off-host backup target | Not verified | Must be confirmed by the operator before deployment. |
 | Rollback owner | Not verified | Must be named before deployment. |
-| Manual 1Panel Deploy Gate | Blocked | Opens only after explicit user approval. |
+| Manual 1Panel Deploy Gate | Human action completed | Target running-service evidence shows Compose containers, runtime health, and adapter workers are running. |
 | Final release | Blocked | Requires post-deploy service checks and real Feishu 8 Agent E2E. |
 
 ## Required Human Confirmation
