@@ -6,6 +6,7 @@ param(
     [string]$ExpectedAppMapPath = "",
     [int]$Tail = 80,
     [switch]$SkipAdapter,
+    [switch]$SkipLocalLogs,
     [switch]$Json
 )
 
@@ -172,7 +173,10 @@ if (-not $SkipAdapter) {
     }
 }
 
-$recentProblems = @(Get-RecentProblems -LineCount $Tail)
+$recentProblems = @()
+if (-not $SkipLocalLogs) {
+    $recentProblems = @(Get-RecentProblems -LineCount $Tail)
+}
 if ($recentProblems.Count -gt 0) {
     $failures.Add("Recent local stderr logs contain $($recentProblems.Count) problem line(s)")
 }
@@ -202,7 +206,9 @@ if ($Json) {
         $result.adapter_workers | Format-Table -AutoSize
     }
     "Recent problems"
-    if ($recentProblems.Count -gt 0) {
+    if ($SkipLocalLogs) {
+        "Skipped local stderr log scan."
+    } elseif ($recentProblems.Count -gt 0) {
         $recentProblems | Format-Table -AutoSize
     } else {
         "No recent problem lines in local stderr logs."
