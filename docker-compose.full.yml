@@ -16,6 +16,8 @@ services:
     volumes:
       - ./feishu-agent-runtime/data:/app/data
       - ./config/agent-runtime-config.json:/app/config/agent-runtime-config.json:ro
+    networks:
+      - 1panel-network
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=3).read()"]
       interval: 30s
@@ -42,3 +44,9 @@ services:
     volumes:
       - ./config/agent-runtime-config.json:/app/config/agent-runtime-config.json:ro
       - ./feishu-channel-adapter/status:/app/status
+    networks:
+      - 1panel-network
+
+networks:
+  1panel-network:
+    external: true
