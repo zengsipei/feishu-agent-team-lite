@@ -9,6 +9,7 @@ class AgentApp:
     agent_name: str
     app_id: str
     app_secret: str
+    mention_names: tuple[str, ...] = ()
 
 
 class AgentAppRegistry:
@@ -28,6 +29,7 @@ class AgentAppRegistry:
                 agent_name=item["agent_name"],
                 app_id=item["app_id"],
                 app_secret=item.get("app_secret", ""),
+                mention_names=_mention_names(item),
             )
             if not app.app_secret:
                 raise ValueError(f"Missing app_secret for agent {app.agent_id} / app {app.app_id}")
@@ -43,3 +45,23 @@ class AgentAppRegistry:
         if enabled_agent_ids:
             apps = [app for app in apps if app.agent_id in enabled_agent_ids]
         return apps
+
+    def get_app(self, agent_id: str) -> AgentApp | None:
+        for app in self._apps:
+            if app.agent_id == agent_id:
+                return app
+        return None
+
+
+def _mention_names(item: dict) -> tuple[str, ...]:
+    names: list[str] = []
+    raw_names = item.get("mention_names", [])
+    if isinstance(raw_names, str):
+        raw_names = [raw_names]
+    for value in [item.get("agent_name"), *list(raw_names or [])]:
+        if not isinstance(value, str):
+            continue
+        name = value.strip()
+        if name and name not in names:
+            names.append(name)
+    return tuple(names)
