@@ -208,8 +208,44 @@ class FeishuBaseControlPlaneProtocolTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(records, [{"fields": {"Agent ID": "coding"}}])
         self.assertEqual(calls[0]["method"], "GET")
         self.assertEqual(calls[0]["path"], "/open-apis/base/v3/bases/base-token/tables/tbl_agents/records")
-        self.assertEqual(calls[0]["params"], {"limit": 500, "offset": 0})
+        self.assertEqual(calls[0]["params"], {"limit": 200, "offset": 0})
         self.assertIsNone(calls[0]["json_body"])
+
+    async def test_list_records_paginates_with_feishu_limit(self) -> None:
+        control = self.make_control_plane()
+        calls = []
+
+        async def fake_request(method, path, *, json_body=None, params=None):
+            calls.append({"method": method, "path": path, "json_body": json_body, "params": params})
+            if params["offset"] == 0:
+                return {
+                    "data": {
+                        "items": [{"fields": {"Agent ID": "coding"}}],
+                        "has_more": True,
+                    }
+                }
+            return {
+                "data": {
+                    "items": [{"fields": {"Agent ID": "review"}}],
+                    "has_more": False,
+                }
+            }
+
+        control._request = fake_request
+        try:
+            records = await control._list_records("tbl_agents")
+        finally:
+            await control.close()
+
+        self.assertEqual(
+            records,
+            [
+                {"fields": {"Agent ID": "coding"}},
+                {"fields": {"Agent ID": "review"}},
+            ],
+        )
+        self.assertEqual(calls[0]["params"], {"limit": 200, "offset": 0})
+        self.assertEqual(calls[1]["params"], {"limit": 200, "offset": 1})
 
     async def test_list_records_accepts_base_v3_matrix_shape(self) -> None:
         control = self.make_control_plane()

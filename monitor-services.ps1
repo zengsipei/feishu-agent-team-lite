@@ -5,6 +5,7 @@ param(
     [int]$ExpectedAgentCount = 8,
     [string]$ExpectedAppMapPath = "",
     [int]$LogTail = 300,
+    [int]$LogSinceMinutes = 30,
     [switch]$Docker,
     [switch]$Json
 )
@@ -60,12 +61,25 @@ function Invoke-SmokeJson {
 }
 
 function Get-DockerProblems {
-    param([int]$Tail)
+    param(
+        [int]$Tail,
+        [int]$SinceMinutes
+    )
 
     $patterns = "ERROR|WARNING|Traceback|Exception|exited|failed|retrying|Runtime returned status=error"
     $services = @("feishu-agent-runtime", "feishu-channel-adapter")
     foreach ($service in $services) {
-        $logs = docker compose -f (Join-Path $ServicesRoot "docker-compose.full.yml") logs "--tail=$Tail" $service 2>$null
+        $args = @(
+            "-f",
+            (Join-Path $ServicesRoot "docker-compose.full.yml"),
+            "logs",
+            "--tail=$Tail"
+        )
+        if ($SinceMinutes -gt 0) {
+            $args += "--since=$($SinceMinutes)m"
+        }
+        $args += $service
+        $logs = docker compose @args 2>$null
         $logs | Select-String -Pattern $patterns | ForEach-Object {
             [pscustomobject]@{
                 service = $service
@@ -76,13 +90,23 @@ function Get-DockerProblems {
 }
 
 function Get-LocalProblems {
-    param([int]$Tail)
+    param(
+        [int]$Tail,
+        [int]$SinceMinutes
+    )
 
     $patterns = "ERROR|WARNING|Traceback|Exception|exited|failed|retrying|Runtime returned status=error"
     $runDir = Join-Path $ServicesRoot ".local-run"
+    $threshold = $null
+    if ($SinceMinutes -gt 0) {
+        $threshold = (Get-Date).AddMinutes(-$SinceMinutes)
+    }
     foreach ($name in @("runtime.err.log", "adapter.err.log")) {
         $path = Join-Path $runDir $name
         if (-not (Test-Path -LiteralPath $path)) {
+            continue
+        }
+        if ($threshold -and (Get-Item -LiteralPath $path).LastWriteTime -lt $threshold) {
             continue
         }
         Get-Content -Tail $Tail -LiteralPath $path |
@@ -137,9 +161,9 @@ if ($Docker) {
 }
 
 $logProblems = if ($Docker) {
-    @(Get-DockerProblems -Tail $LogTail)
+    @(Get-DockerProblems -Tail $LogTail -SinceMinutes $LogSinceMinutes)
 } else {
-    @(Get-LocalProblems -Tail $LogTail)
+    @(Get-LocalProblems -Tail $LogTail -SinceMinutes $LogSinceMinutes)
 }
 if ($logProblems.Count -gt 0) {
     $failures.Add("Recent logs contain $($logProblems.Count) problem line(s)")

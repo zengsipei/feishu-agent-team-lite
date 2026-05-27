@@ -9,6 +9,8 @@ from .agents import AgentConfig
 
 logger = logging.getLogger(__name__)
 
+BASE_RECORD_PAGE_LIMIT = 200
+
 
 @dataclass(frozen=True)
 class ControlPlanePrompt:
@@ -246,27 +248,25 @@ class FeishuBaseControlPlane:
         return text
 
     async def _list_records(self, table_id: str) -> list[dict[str, Any]]:
-        data = await self._request(
-            "GET",
-            f"/open-apis/base/v3/bases/{self.base_token}/tables/{table_id}/records",
-            params={"limit": 500, "offset": 0},
-        )
-        response_data = data.get("data", {})
-        if not isinstance(response_data, dict):
-            return []
+        records: list[dict[str, Any]] = []
+        offset = 0
 
-        items = response_data.get("items")
-        if items is None:
-            items = response_data.get("records")
-        if items is None:
-            items = _records_from_matrix(
-                fields=response_data.get("fields"),
-                rows=response_data.get("data"),
-                record_ids=response_data.get("record_id_list"),
+        while True:
+            data = await self._request(
+                "GET",
+                f"/open-apis/base/v3/bases/{self.base_token}/tables/{table_id}/records",
+                params={"limit": BASE_RECORD_PAGE_LIMIT, "offset": offset},
             )
-        if items is None or not isinstance(items, list):
-            return []
-        return [item for item in items if isinstance(item, dict)]
+            response_data = data.get("data", {})
+            if not isinstance(response_data, dict):
+                return records
+
+            page_records = _records_from_response_data(response_data)
+            records.extend(page_records)
+
+            if not response_data.get("has_more") or not page_records:
+                return records
+            offset += len(page_records)
 
     async def _create_record(self, table_id: str, fields: dict[str, Any]) -> dict:
         return await self._request(
@@ -279,6 +279,21 @@ class FeishuBaseControlPlane:
 def _fields(record: dict[str, Any]) -> dict[str, Any]:
     fields = record.get("fields", {})
     return fields if isinstance(fields, dict) else {}
+
+
+def _records_from_response_data(response_data: dict[str, Any]) -> list[dict[str, Any]]:
+    items = response_data.get("items")
+    if items is None:
+        items = response_data.get("records")
+    if items is None:
+        items = _records_from_matrix(
+            fields=response_data.get("fields"),
+            rows=response_data.get("data"),
+            record_ids=response_data.get("record_id_list"),
+        )
+    if items is None or not isinstance(items, list):
+        return []
+    return [item for item in items if isinstance(item, dict)]
 
 
 def _records_from_matrix(*, fields: Any, rows: Any, record_ids: Any) -> list[dict[str, Any]] | None:
