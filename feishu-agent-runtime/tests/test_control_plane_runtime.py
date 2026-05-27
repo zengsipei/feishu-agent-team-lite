@@ -29,6 +29,11 @@ class FakeLLM:
         return self.reply
 
 
+class FailingLLM:
+    async def complete(self, *, agent, user_text, history, metadata):
+        raise RuntimeError("provider unavailable")
+
+
 class FakeControlPlane:
     def __init__(self, prompt: ControlPlanePrompt | None = None):
         self.prompt = prompt
@@ -164,6 +169,41 @@ class ControlPlaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(proposal.prompt_text, "作为 Coding Agent，先确认执行权限。")
         self.assertEqual(run_id, reply.response_id)
 
+    async def test_llm_error_reports_control_plane_prompt_source(self) -> None:
+        control = FakeControlPlane(
+            ControlPlanePrompt(
+                text="feishu prompt",
+                source="feishu_base",
+                version="v1",
+            )
+        )
+        runtime = self.make_runtime(
+            llm_reply='{"reply_text":"unused","handoff":null}',
+            control_plane=control,
+        )
+        runtime.llm = FailingLLM()
+
+        reply = await runtime.handle_message(
+            ChannelMessage(
+                event_id="event-3",
+                message_id="message-3",
+                agent_id="coding",
+                chat_id="project-1",
+                sender_id="sender-1",
+                text="hello",
+                project_id="project-1",
+            )
+        )
+
+        self.assertEqual(reply.status, "error")
+        self.assertEqual(reply.metadata["prompt_source"], "feishu_base")
+        self.assertEqual(reply.metadata["prompt_version"], "v1")
+        self.assertFalse(reply.metadata["prompt_proposal_created"])
+        self.assertEqual(len(control.runs), 1)
+        self.assertEqual(control.runs[0].status, "error")
+        self.assertEqual(control.runs[0].prompt_source, "feishu_base")
+        self.assertEqual(control.runs[0].prompt_version, "v1")
+
 
 class ControlPlaneConfigTests(unittest.TestCase):
     def test_disabled_control_plane_uses_null_adapter(self) -> None:
@@ -173,7 +213,17 @@ class ControlPlaneConfigTests(unittest.TestCase):
 
     def test_enabled_control_plane_requires_all_runtime_keys(self) -> None:
         with self.assertRaisesRegex(RuntimeError, "CONTROL_PLANE_APP_ID"):
-            build_control_plane(Settings(control_plane_enabled=True))
+            build_control_plane(
+                Settings(
+                    control_plane_enabled=True,
+                    control_plane_app_id="",
+                    control_plane_app_secret="",
+                    control_plane_base_token="",
+                    control_plane_agents_table_id="",
+                    control_plane_prompt_versions_table_id="",
+                    control_plane_agent_runs_table_id="",
+                )
+            )
 
 
 class FeishuBaseControlPlaneProtocolTests(unittest.IsolatedAsyncioTestCase):

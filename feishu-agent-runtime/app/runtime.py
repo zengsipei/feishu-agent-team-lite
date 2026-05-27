@@ -139,7 +139,13 @@ class AgentRuntime:
                 agent_name=agent.agent_name,
                 session_id=session_id,
                 reply_text="模型服务暂时不可用，请稍后重试。",
-                metadata={"project_id": project_id, "error": type(exc).__name__},
+                metadata={
+                    "project_id": project_id,
+                    "error": type(exc).__name__,
+                    "prompt_source": prompt_source,
+                    "prompt_version": prompt_version,
+                    "prompt_proposal_created": False,
+                },
             )
         reply_text, handoff, proposal, envelope_parsed = parse_reply_envelope_with_proposal(
             raw_reply_text,
