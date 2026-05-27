@@ -14,6 +14,16 @@ Feishu
   <-> model backend
 ```
 
+## 服务边界
+
+| 部分 | 边界 |
+| --- | --- |
+| `runtime` | 接收标准化消息，读取 Agent prompt，调用 OpenAI-compatible 模型，写入最小审计和 Control Plane 记录。 |
+| `adapter` | 维护飞书 Channel SDK 长连接，标准化事件，发送回复和真实富文本 `@` 接力消息。 |
+| `handoff` | 只表达一次可见接力意图，由 adapter 发送；loop guard 负责重复接力拦截。 |
+| `monitor` | 只读健康检查、worker 状态和近期日志窗口，不改变服务状态。 |
+| `config` | `agent-runtime-config.json` 是启动配置；长期 Agent Memory 和项目状态放飞书。 |
+
 ## 共享配置
 
 两个服务共用同一份：
